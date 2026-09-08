@@ -7,12 +7,13 @@ import (
 )
 
 type analysisResponse struct {
-	ID             string    `json:"id"`
-	CreatedAt      time.Time `json:"createdAt"`
-	RequestCount   int       `json:"requestCount"`
-	EndpointCount  int       `json:"endpointCount"`
-	SessionCount   int       `json:"sessionArtifactCount"`
-	ImportDuration int64     `json:"importDurationMs"`
+	ID              string    `json:"id"`
+	CreatedAt       time.Time `json:"createdAt"`
+	RequestCount    int       `json:"requestCount"`
+	EndpointCount   int       `json:"endpointCount"`
+	SessionCount    int       `json:"sessionArtifactCount"`
+	DependencyCount int       `json:"dependencyCount"`
+	ImportDuration  int64     `json:"importDurationMs"`
 }
 
 type endpointResponse struct {
@@ -42,14 +43,30 @@ type sessionArtifactResponse struct {
 	Metadata       map[string]string `json:"metadata,omitempty"`
 }
 
+type dependenciesResponse struct {
+	Dependencies []dependencyResponse `json:"dependencies"`
+}
+
+type dependencyResponse struct {
+	ID              string `json:"id"`
+	SourceRequestID string `json:"sourceRequestId"`
+	TargetRequestID string `json:"targetRequestId"`
+	SourcePath      string `json:"sourcePath"`
+	TargetLocation  string `json:"targetLocation"`
+	TargetPath      string `json:"targetPath"`
+	Confidence      string `json:"confidence"`
+	Reason          string `json:"reason"`
+}
+
 func toAnalysisResponse(analysis domain.Analysis) analysisResponse {
 	return analysisResponse{
-		ID:             analysis.ID,
-		CreatedAt:      analysis.CreatedAt,
-		RequestCount:   analysis.RequestCount,
-		EndpointCount:  analysis.EndpointCount,
-		SessionCount:   analysis.SessionCount,
-		ImportDuration: analysis.ImportDuration,
+		ID:              analysis.ID,
+		CreatedAt:       analysis.CreatedAt,
+		RequestCount:    analysis.RequestCount,
+		EndpointCount:   analysis.EndpointCount,
+		SessionCount:    analysis.SessionCount,
+		DependencyCount: analysis.DependencyCount,
+		ImportDuration:  analysis.ImportDuration,
 	}
 }
 
@@ -76,6 +93,23 @@ func toSessionArtifactsResponse(artifacts []domain.SessionArtifact) sessionArtif
 		}
 	}
 	return sessionArtifactsResponse{Artifacts: out}
+}
+
+func toDependenciesResponse(dependencies []domain.Dependency) dependenciesResponse {
+	out := make([]dependencyResponse, len(dependencies))
+	for n, dependency := range dependencies {
+		out[n] = dependencyResponse{
+			ID:              dependency.ID,
+			SourceRequestID: dependency.SourceRequestID,
+			TargetRequestID: dependency.TargetRequestID,
+			SourcePath:      dependency.SourcePath,
+			TargetLocation:  dependency.TargetLocation,
+			TargetPath:      dependency.TargetPath,
+			Confidence:      string(dependency.Confidence),
+			Reason:          dependency.Reason,
+		}
+	}
+	return dependenciesResponse{Dependencies: out}
 }
 
 func toEndpointResponses(endpoints []domain.EndpointSummary) []endpointResponse {

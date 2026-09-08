@@ -53,3 +53,42 @@ func TestImportAnalysisDoesNotPersistRawSecrets(t *testing.T) {
 		}
 	}
 }
+
+func TestImportAnalysisDoesNotCopyDependencyValuesIntoEvidence(t *testing.T) {
+	ctx := context.Background()
+	store, err := sqlite.Open(ctx, t.TempDir()+"/dependencies.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	input, err := os.Open("../../examples/har/dependency.har")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer input.Close()
+
+	analysis, err := app.NewImportAnalysis(har.NewImporter(1024*1024), store).Execute(ctx, input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if analysis.RequestCount != 6 || analysis.EndpointCount != 6 || analysis.DependencyCount != 4 {
+		t.Fatalf("analysis = %#v", analysis)
+	}
+
+	dependencies, err := store.ListDependencies(ctx, analysis.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(dependencies) != 4 {
+		t.Fatalf("dependencies = %#v", dependencies)
+	}
+	for _, dependency := range dependencies {
+		fields := strings.Join([]string{dependency.SourcePath, dependency.TargetLocation, dependency.TargetPath, dependency.Reason}, "\x00")
+		for _, value := range []string{"item_12345", "next_abc123", "p_12345", "form_98765"} {
+			if strings.Contains(fields, value) {
+				t.Fatalf("dependency evidence leaked %q in %#v", value, dependency)
+			}
+		}
+	}
+}

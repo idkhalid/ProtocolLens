@@ -4,6 +4,7 @@ export type Analysis = {
   requestCount: number
   endpointCount: number
   sessionArtifactCount: number
+  dependencyCount: number
   importDurationMs: number
 }
 
@@ -32,4 +33,19 @@ export type SessionArtifact = {
 
 export type SessionArtifactsResponse = {
   artifacts: SessionArtifact[]
+}
+
+export type Dependency = {
+  id: string
+  sourceRequestId: string
+  targetRequestId: string
+  sourcePath: string
+  targetLocation: string
+  targetPath: string
+  confidence: 'high' | 'medium'
+  reason: string
+}
+
+export type DependenciesResponse = {
+  dependencies: Dependency[]
 }
