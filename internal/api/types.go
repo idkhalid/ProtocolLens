@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"protocollens/internal/domain"
+	"protocollens/internal/graph"
 )
 
 type analysisResponse struct {
@@ -58,6 +59,34 @@ type dependencyResponse struct {
 	Reason          string `json:"reason"`
 }
 
+type workflowResponse struct {
+	Nodes []workflowNodeResponse `json:"nodes"`
+	Edges []workflowEdgeResponse `json:"edges"`
+}
+
+type workflowNodeResponse struct {
+	ID         string `json:"id"`
+	RequestID  string `json:"requestId"`
+	Order      int    `json:"order"`
+	Method     string `json:"method"`
+	Host       string `json:"host"`
+	Path       string `json:"path"`
+	StatusCode int    `json:"statusCode"`
+	DurationMs int64  `json:"durationMs"`
+}
+
+type workflowEdgeResponse struct {
+	ID             string `json:"id"`
+	Source         string `json:"source"`
+	Target         string `json:"target"`
+	Type           string `json:"type"`
+	Confidence     string `json:"confidence"`
+	Reason         string `json:"reason"`
+	SourcePath     string `json:"sourcePath"`
+	TargetLocation string `json:"targetLocation"`
+	TargetPath     string `json:"targetPath"`
+}
+
 func toAnalysisResponse(analysis domain.Analysis) analysisResponse {
 	return analysisResponse{
 		ID:              analysis.ID,
@@ -110,6 +139,37 @@ func toDependenciesResponse(dependencies []domain.Dependency) dependenciesRespon
 		}
 	}
 	return dependenciesResponse{Dependencies: out}
+}
+
+func toWorkflowResponse(workflow graph.Graph) workflowResponse {
+	nodes := make([]workflowNodeResponse, len(workflow.Nodes))
+	for n, node := range workflow.Nodes {
+		nodes[n] = workflowNodeResponse{
+			ID:         node.ID,
+			RequestID:  node.RequestID,
+			Order:      node.Order,
+			Method:     node.Method,
+			Host:       node.Host,
+			Path:       node.Path,
+			StatusCode: node.StatusCode,
+			DurationMs: node.Duration.Milliseconds(),
+		}
+	}
+	edges := make([]workflowEdgeResponse, len(workflow.Edges))
+	for n, edge := range workflow.Edges {
+		edges[n] = workflowEdgeResponse{
+			ID:             edge.ID,
+			Source:         edge.Source,
+			Target:         edge.Target,
+			Type:           string(edge.Type),
+			Confidence:     string(edge.Confidence),
+			Reason:         edge.Reason,
+			SourcePath:     edge.SourcePath,
+			TargetLocation: edge.TargetLocation,
+			TargetPath:     edge.TargetPath,
+		}
+	}
+	return workflowResponse{Nodes: nodes, Edges: edges}
 }
 
 func toEndpointResponses(endpoints []domain.EndpointSummary) []endpointResponse {

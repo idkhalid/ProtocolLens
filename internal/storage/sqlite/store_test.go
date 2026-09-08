@@ -177,3 +177,29 @@ func countRows(t *testing.T, store *Store, table string) int {
 	}
 	return count
 }
+
+func TestStoreListsExchangesInCaptureIDOrder(t *testing.T) {
+	ctx := context.Background()
+	store, err := Open(ctx, t.TempDir()+"/exchanges.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	analysis := domain.Analysis{ID: "a1", CreatedAt: time.Now().UTC(), RequestCount: 2}
+	exchanges := []domain.Exchange{
+		{Request: domain.Request{ID: "req-000002", Method: "GET", URL: "https://example.com/two"}},
+		{Request: domain.Request{ID: "req-000001", Method: "GET", URL: "https://example.com/one"}},
+	}
+	if err := store.SaveAnalysis(ctx, analysis, exchanges, nil, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := store.ListExchanges(ctx, "a1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 || got[0].Request.ID != "req-000001" || got[1].Request.ID != "req-000002" {
+		t.Fatalf("exchanges = %#v", got)
+	}
+}

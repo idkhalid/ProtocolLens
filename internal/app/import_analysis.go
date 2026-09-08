@@ -19,6 +19,7 @@ type Store interface {
 	GetAnalysis(ctx context.Context, id string) (domain.Analysis, error)
 	ListAnalyses(ctx context.Context) ([]domain.Analysis, error)
 	ListEndpoints(ctx context.Context, analysisID string) ([]domain.EndpointSummary, error)
+	ListExchanges(ctx context.Context, analysisID string) ([]domain.Exchange, error)
 	ListSessionArtifacts(ctx context.Context, analysisID string) ([]domain.SessionArtifact, error)
 	ListDependencies(ctx context.Context, analysisID string) ([]domain.Dependency, error)
 }

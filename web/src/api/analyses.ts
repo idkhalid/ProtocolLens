@@ -1,5 +1,5 @@
 import { api } from './client'
-import type { Analysis, DependenciesResponse, Endpoint, SessionArtifactsResponse } from '../types/api'
+import type { Analysis, DependenciesResponse, Endpoint, SessionArtifactsResponse, WorkflowGraph } from '../types/api'
 
 export function listAnalyses() {
   return api<Analysis[]>('/api/v1/analyses')
@@ -15,6 +15,10 @@ export function getSessions(analysisID: string) {
 
 export function getDependencies(analysisID: string) {
   return api<DependenciesResponse>(`/api/v1/analyses/${analysisID}/dependencies`)
+}
+
+export function getWorkflow(analysisID: string) {
+  return api<WorkflowGraph>(`/api/v1/analyses/${analysisID}/workflow`)
 }
 
 export function importHAR(file: File) {

@@ -49,3 +49,30 @@ export type Dependency = {
 export type DependenciesResponse = {
   dependencies: Dependency[]
 }
+export type WorkflowNode = {
+  id: string
+  requestId: string
+  order: number
+  method: string
+  host: string
+  path: string
+  statusCode: number
+  durationMs: number
+}
+
+export type WorkflowEdge = {
+  id: string
+  source: string
+  target: string
+  type: 'data_dependency'
+  confidence: 'high' | 'medium'
+  reason: string
+  sourcePath: string
+  targetLocation: string
+  targetPath: string
+}
+
+export type WorkflowGraph = {
+  nodes: WorkflowNode[]
+  edges: WorkflowEdge[]
+}
