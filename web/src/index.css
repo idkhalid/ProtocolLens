@@ -3,17 +3,335 @@
 @tailwind utilities;
 
 :root {
-  color: #1e293b;
-  background: #f8fafc;
-  font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color-scheme: light;
+  --app-bg: #f6f7f8;
+  --bar-bg: #ffffff;
+  --sidebar-bg: #f1f3f5;
+  --workspace: #fafafa;
+  --panel: #ffffff;
+  --panel-alt: #f6f8fa;
+  --text: #1f2937;
+  --muted: #6b7280;
+  --border: #d7dce1;
+  --border-strong: #aeb6bf;
+  --accent: #0f766e;
+  --accent-strong: #0b5f59;
+  --accent-soft: #d9f3ef;
+  --danger: #b42318;
+  --danger-bg: #fff1f0;
+  --danger-border: #f3b6af;
+  --warning-bg: #fff8db;
+  --warning-text: #7a5b00;
+  --flow-grid: #c8d0d8;
+  background: var(--app-bg);
+  color: var(--text);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --app-bg: #111315;
+  --bar-bg: #171a1d;
+  --sidebar-bg: #14171a;
+  --workspace: #0f1113;
+  --panel: #181b1f;
+  --panel-alt: #20242a;
+  --text: #d7dde4;
+  --muted: #8f9aa6;
+  --border: #2e343b;
+  --border-strong: #48515c;
+  --accent: #14b8a6;
+  --accent-strong: #2dd4bf;
+  --accent-soft: #113b38;
+  --danger: #ffb4a8;
+  --danger-bg: #3b1514;
+  --danger-border: #6a2925;
+  --warning-bg: #322909;
+  --warning-text: #f5d36b;
+  --flow-grid: #303842;
+}
+
+* {
+  box-sizing: border-box;
 }
 
 body {
   margin: 0;
+  min-width: 320px;
+  overflow-x: hidden;
+  background: var(--app-bg);
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
+}
+
+button {
+  color: inherit;
+}
+
+.icon-button {
+  display: inline-flex;
+  height: 1.75rem;
+  width: 1.75rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel);
+  color: var(--muted);
+}
+
+.icon-button:hover,
+.nav-item:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.nav-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 0.4rem 0.5rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1rem;
+  text-align: left;
+}
+
+.nav-item.active {
+  border-color: var(--border);
+  background: var(--panel);
+  color: var(--text);
+}
+
+.metric {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel);
+  padding: 0.75rem;
+}
+
+.table-shell {
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.data-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 0.76rem;
+  line-height: 1rem;
+  text-align: left;
+}
+
+.data-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-alt);
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 0.5rem 0.55rem;
+  text-transform: uppercase;
+}
+
+.data-table td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  padding: 0.48rem 0.55rem;
+}
+
+.data-table tr {
+  cursor: pointer;
+}
+
+.data-table tbody tr:hover,
+.data-table tbody tr.selected {
+  background: var(--accent-soft);
+}
+
+.data-table .mono,
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+
+.data-table .strong {
+  color: var(--text);
+}
+
+.data-table .numeric {
+  text-align: right;
+}
+
+.method,
+.status,
+.artifact,
+.confidence {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 0.05rem 0.32rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 0.68rem;
+  line-height: 0.95rem;
+  color: var(--text);
+}
+
+.status,
+.method,
+.confidence {
+  margin-right: 0.25rem;
+}
+
+.method-get,
+.s2,
+.confidence.high {
+  border-color: #34a85355;
+  color: #1f8f4d;
+  background: #34a85318;
+}
+
+.method-post,
+.s3,
+.confidence.medium {
+  border-color: #c58b1f55;
+  color: #a36a00;
+  background: #c58b1f18;
+}
+
+.method-put,
+.method-patch {
+  border-color: #3b82f655;
+  color: #2563eb;
+  background: #3b82f618;
+}
+
+.method-delete,
+.s4,
+.s5 {
+  border-color: #d9302555;
+  color: #c0281f;
+  background: #d9302518;
+}
+
+.notice {
+  border: 1px solid #d6ae4f;
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  padding: 0.6rem 0.75rem;
+  font-size: 0.75rem;
+}
+
+.notice.muted {
+  border-color: var(--border);
+  background: var(--panel);
+  color: var(--muted);
+}
+
+.workflow-canvas {
+  width: 100%;
+  height: min(62dvh, 620px);
+  min-height: 340px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.workflow-node {
+  width: 13rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--panel);
+  padding: 0.55rem;
+  text-align: left;
+}
+
+.react-flow {
+  background: var(--panel);
+  color: var(--text);
+}
+
+.react-flow__edge-path,
+.react-flow__connection-path {
+  stroke: var(--muted);
+}
+
+.react-flow__edge.workflow-edge-high .react-flow__edge-path {
+  stroke: var(--accent);
+}
+
+.react-flow__edge.workflow-edge-medium .react-flow__edge-path {
+  stroke: var(--muted);
+}
+
+.react-flow__edge-textbg {
+  fill: var(--panel);
+}
+
+.react-flow__edge-text {
+  fill: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 10px;
+}
+
+.react-flow__controls button {
+  border-color: var(--border);
+  background: var(--panel);
+  color: var(--text);
+}
+
+@media (max-width: 640px) {
+  .upload-label {
+    display: none;
+  }
+
+  .upload-button {
+    width: 1.9rem;
+    justify-content: center;
+    padding-inline: 0;
+  }
+
+  .status-bar {
+    min-height: 2rem;
+  }
+
+  .status-bar span {
+    white-space: nowrap;
+  }
+
+  .data-table {
+    min-width: 680px;
+  }
+
+  .workflow-canvas {
+    height: 46dvh;
+    min-height: 300px;
+  }
+
+  .workflow-node {
+    width: 11.5rem;
+  }
+}
+
+@media (min-width: 641px) and (max-width: 1023px) {
+  .workflow-canvas {
+    height: 54dvh;
+  }
 }
