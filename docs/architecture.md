@@ -10,9 +10,9 @@ ProtocolLens is a Go application with a React visualization layer. The backend o
 
 `internal/normalize` converts captured data into `domain.Exchange`, including URL parsing, header casing, query extraction, timestamp handling, and body decoding.
 
-`internal/analyzer` runs explicit analyzers over normalized domain data. The first implemented analyzer aggregates endpoints by method, host, and path.
+`internal/analyzer` runs explicit analyzers over normalized domain data. Endpoint analysis aggregates method, host, and path. Session analysis detects safe metadata for cookies, bearer authorization, CSRF headers, and explicit API key headers.
 
-`internal/storage/sqlite` persists analyses, exchanges, and endpoint summaries with `database/sql`.
+`internal/storage/sqlite` persists analyses, exchanges, endpoint summaries, and session artifacts with `database/sql`.
 
 `internal/app` is the shared application layer used by both the CLI and HTTP API.
 
@@ -20,8 +20,8 @@ ProtocolLens is a Go application with a React visualization layer. The backend o
 
 ## Frontend
 
-`web` is a Vite React app. It uploads HAR files and displays analysis summaries and endpoints returned by the Go API. It does not parse HAR or infer protocol behavior.
+`web` is a Vite React app. It uploads HAR files and displays analysis summaries, endpoints, and session artifacts returned by the Go API. It does not parse HAR or infer protocol behavior.
 
 ## Deferred
 
-Replay, generation, dependency inference, session analysis, workflow graphs, Playwright import, WebSocket/SSE analysis, and authentication are intentionally absent until a real slice needs them.
+Replay, generation, dependency inference, workflow graphs, Playwright import, WebSocket/SSE analysis, and authentication are intentionally absent until a real slice needs them.

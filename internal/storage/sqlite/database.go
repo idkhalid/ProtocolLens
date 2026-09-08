@@ -3,9 +3,13 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"io/fs"
 	_ "modernc.org/sqlite"
 	"os"
 	"path/filepath"
+	"sort"
+
+	"protocollens/internal/storage/migrations"
 )
 
 type Store struct {
@@ -41,37 +45,60 @@ func (s *Store) Close() error {
 }
 
 func (s *Store) migrate(ctx context.Context) error {
-	_, err := s.db.ExecContext(ctx, `
-CREATE TABLE IF NOT EXISTS analyses (
-	id TEXT PRIMARY KEY,
-	created_at TEXT NOT NULL,
-	request_count INTEGER NOT NULL,
-	endpoint_count INTEGER NOT NULL,
-	import_duration_ms INTEGER NOT NULL
-);
+	if _, err := s.db.ExecContext(ctx, `
+CREATE TABLE IF NOT EXISTS schema_migrations (
+	version TEXT PRIMARY KEY,
+	applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+)`); err != nil {
+		return err
+	}
 
-CREATE TABLE IF NOT EXISTS exchanges (
-	id TEXT NOT NULL,
-	analysis_id TEXT NOT NULL,
-	request_json TEXT NOT NULL,
-	response_json TEXT NOT NULL,
-	PRIMARY KEY (analysis_id, id),
-	FOREIGN KEY (analysis_id) REFERENCES analyses(id) ON DELETE CASCADE
-);
+	files, err := fs.Glob(migrations.FS, "*.sql")
+	if err != nil {
+		return err
+	}
+	sort.Strings(files)
 
-CREATE TABLE IF NOT EXISTS endpoints (
-	analysis_id TEXT NOT NULL,
-	method TEXT NOT NULL,
-	host TEXT NOT NULL,
-	path TEXT NOT NULL,
-	request_count INTEGER NOT NULL,
-	status_codes_json TEXT NOT NULL,
-	average_duration_ms REAL NOT NULL,
-	min_duration_ms REAL NOT NULL,
-	max_duration_ms REAL NOT NULL,
-	content_types_json TEXT NOT NULL,
-	PRIMARY KEY (analysis_id, method, host, path),
-	FOREIGN KEY (analysis_id) REFERENCES analyses(id) ON DELETE CASCADE
-);`)
-	return err
+	for _, name := range files {
+		applied, err := s.migrationApplied(ctx, name)
+		if err != nil {
+			return err
+		}
+		if applied {
+			continue
+		}
+		if err := s.applyMigration(ctx, name); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Store) applyMigration(ctx context.Context, name string) error {
+	sqlBytes, err := migrations.FS.ReadFile(name)
+	if err != nil {
+		return err
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.ExecContext(ctx, string(sqlBytes)); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, "INSERT INTO schema_migrations (version) VALUES (?)", name); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func (s *Store) migrationApplied(ctx context.Context, version string) (bool, error) {
+	var exists int
+	err := s.db.QueryRowContext(ctx, "SELECT 1 FROM schema_migrations WHERE version = ?", version).Scan(&exists)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+	return err == nil, err
 }

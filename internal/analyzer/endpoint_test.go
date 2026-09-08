@@ -38,7 +38,7 @@ func exchange(method, rawURL string, status int, duration time.Duration) domain.
 		},
 		Response: domain.Response{
 			StatusCode: status,
-			Headers:    map[string]string{"Content-Type": "application/json"},
+			Headers:    map[string][]string{"Content-Type": {"application/json"}},
 			Duration:   duration,
 		},
 	}

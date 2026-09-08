@@ -3,6 +3,7 @@ export type Analysis = {
   createdAt: string
   requestCount: number
   endpointCount: number
+  sessionArtifactCount: number
   importDurationMs: number
 }
 
@@ -16,4 +17,19 @@ export type Endpoint = {
   minDurationMs: number
   maxDurationMs: number
   contentTypes: string[]
+}
+
+export type SessionArtifact = {
+  id: string
+  type: 'cookie' | 'bearer' | 'csrf' | 'api_key'
+  name: string
+  source: string
+  firstRequestId: string
+  firstSeenAt: string
+  occurrences: number
+  metadata?: Record<string, string>
+}
+
+export type SessionArtifactsResponse = {
+  artifacts: SessionArtifact[]
 }

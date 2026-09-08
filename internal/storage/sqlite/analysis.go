@@ -11,7 +11,7 @@ import (
 	"protocollens/internal/domain"
 )
 
-func (s *Store) SaveAnalysis(ctx context.Context, analysis domain.Analysis, exchanges []domain.Exchange, endpoints []domain.EndpointSummary) error {
+func (s *Store) SaveAnalysis(ctx context.Context, analysis domain.Analysis, exchanges []domain.Exchange, endpoints []domain.EndpointSummary, artifacts []domain.SessionArtifact) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -19,12 +19,13 @@ func (s *Store) SaveAnalysis(ctx context.Context, analysis domain.Analysis, exch
 	defer tx.Rollback()
 
 	_, err = tx.ExecContext(ctx, `
-INSERT INTO analyses (id, created_at, request_count, endpoint_count, import_duration_ms)
-VALUES (?, ?, ?, ?, ?)`,
+INSERT INTO analyses (id, created_at, request_count, endpoint_count, session_artifact_count, import_duration_ms)
+VALUES (?, ?, ?, ?, ?, ?)`,
 		analysis.ID,
 		analysis.CreatedAt.Format(time.RFC3339Nano),
 		analysis.RequestCount,
 		analysis.EndpointCount,
+		analysis.SessionCount,
 		analysis.ImportDuration,
 	)
 	if err != nil {
@@ -83,12 +84,36 @@ INSERT INTO endpoints (
 		}
 	}
 
+	for _, artifact := range artifacts {
+		metadataJSON, err := json.Marshal(artifact.Metadata)
+		if err != nil {
+			return err
+		}
+		_, err = tx.ExecContext(ctx, `
+INSERT INTO session_artifacts (
+	id, analysis_id, type, name, source, first_request_id, first_seen_at, occurrences, metadata_json
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			artifact.ID,
+			analysis.ID,
+			string(artifact.Type),
+			artifact.Name,
+			artifact.Source,
+			artifact.FirstRequestID,
+			artifact.FirstSeenAt.Format(time.RFC3339Nano),
+			artifact.Occurrences,
+			string(metadataJSON),
+		)
+		if err != nil {
+			return err
+		}
+	}
+
 	return tx.Commit()
 }
 
 func (s *Store) GetAnalysis(ctx context.Context, id string) (domain.Analysis, error) {
 	row := s.db.QueryRowContext(ctx, `
-SELECT id, created_at, request_count, endpoint_count, import_duration_ms
+SELECT id, created_at, request_count, endpoint_count, session_artifact_count, import_duration_ms
 FROM analyses
 WHERE id = ?`, id)
 	analysis, err := scanAnalysis(row)
@@ -100,7 +125,7 @@ WHERE id = ?`, id)
 
 func (s *Store) ListAnalyses(ctx context.Context) ([]domain.Analysis, error) {
 	rows, err := s.db.QueryContext(ctx, `
-SELECT id, created_at, request_count, endpoint_count, import_duration_ms
+SELECT id, created_at, request_count, endpoint_count, session_artifact_count, import_duration_ms
 FROM analyses
 ORDER BY created_at DESC`)
 	if err != nil {
@@ -126,7 +151,7 @@ type scanner interface {
 func scanAnalysis(row scanner) (domain.Analysis, error) {
 	var analysis domain.Analysis
 	var createdAt string
-	if err := row.Scan(&analysis.ID, &createdAt, &analysis.RequestCount, &analysis.EndpointCount, &analysis.ImportDuration); err != nil {
+	if err := row.Scan(&analysis.ID, &createdAt, &analysis.RequestCount, &analysis.EndpointCount, &analysis.SessionCount, &analysis.ImportDuration); err != nil {
 		return domain.Analysis{}, err
 	}
 	parsed, err := time.Parse(time.RFC3339Nano, createdAt)
