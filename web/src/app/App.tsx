@@ -8,14 +8,15 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import { FileSearch, Upload } from 'lucide-react'
-import { getDependencies, getEndpoints, getSessions, importHAR, listAnalyses } from '../api/analyses'
+import { getDependencies, getEndpoints, getSessions, getWorkflow, importHAR, listAnalyses } from '../api/analyses'
 import type { Dependency, Endpoint, SessionArtifact } from '../types/api'
+import { WorkflowPage } from '../features/workflow/WorkflowPage'
 
 const endpointColumns = createColumnHelper<Endpoint>()
 const sessionColumns = createColumnHelper<SessionArtifact>()
 const dependencyColumns = createColumnHelper<Dependency>()
 
-type View = 'overview' | 'sessions' | 'dependencies'
+type View = 'overview' | 'sessions' | 'dependencies' | 'workflow'
 
 export function App() {
   const queryClient = useQueryClient()
@@ -42,6 +43,11 @@ export function App() {
     queryFn: () => getDependencies(activeAnalysisID),
     enabled: activeAnalysisID.length > 0,
   })
+  const workflow = useQuery({
+    queryKey: ['workflow', activeAnalysisID],
+    queryFn: () => getWorkflow(activeAnalysisID),
+    enabled: activeAnalysisID.length > 0,
+  })
 
   const upload = useMutation({
     mutationFn: importHAR,
@@ -54,6 +60,7 @@ export function App() {
       queryClient.invalidateQueries({ queryKey: ['endpoints', analysis.id] })
       queryClient.invalidateQueries({ queryKey: ['sessions', analysis.id] })
       queryClient.invalidateQueries({ queryKey: ['dependencies', analysis.id] })
+      queryClient.invalidateQueries({ queryKey: ['workflow', analysis.id] })
     },
   })
 
@@ -127,6 +134,7 @@ export function App() {
             <NavButton active={view === 'overview'} onClick={() => setView('overview')}>Overview</NavButton>
             <NavButton active={view === 'sessions'} onClick={() => setView('sessions')}>Sessions</NavButton>
             <NavButton active={view === 'dependencies'} onClick={() => setView('dependencies')}>Dependencies</NavButton>
+            <NavButton active={view === 'workflow'} onClick={() => setView('workflow')}>Workflow</NavButton>
           </nav>
         </aside>
 
@@ -166,7 +174,9 @@ export function App() {
             <Metric label="Dependencies" value={activeAnalysis?.dependencyCount ?? 0} />
           </div>
 
-          {view === 'overview' ? (
+          {view === 'workflow' ? (
+            <WorkflowPage graph={workflow.data} loading={workflow.isLoading} />
+          ) : view === 'overview' ? (
             <>
               <DataTable
                 table={table}

@@ -1,6 +1,6 @@
 # ProtocolLens
 
-ProtocolLens is a Go-first developer tool for analyzing observable client-side web workflows from browser traffic. The current milestone imports HAR files, normalizes HTTP exchanges, aggregates endpoints, detects session artifacts, infers deterministic request dependencies, stores results in SQLite, and exposes them through a CLI, HTTP API, and thin React UI.
+ProtocolLens is a Go-first developer tool for analyzing observable client-side web workflows from browser traffic. The current milestone imports HAR files, normalizes HTTP exchanges, aggregates endpoints, detects session artifacts, infers deterministic request dependencies, builds derived workflow graphs, stores results in SQLite, and exposes them through a CLI, HTTP API, and thin React UI.
 
 ## Current Capabilities
 
@@ -12,14 +12,14 @@ ProtocolLens is a Go-first developer tool for analyzing observable client-side w
 - Persist analyses, exchanges, endpoints, session artifacts, and dependencies in SQLite
 - Analyze HAR files from the CLI
 - Import and inspect analyses through the HTTP API
-- Upload HAR files and view endpoint, session, and dependency summaries in React
+- Upload HAR files and view endpoint, session, dependency, and workflow graph summaries in React
 
 ## Architecture
 
 The core product is Go. React is only a presentation layer.
 
 ```text
-HAR -> Go importer -> normalizer -> endpoint/session/dependency analyzers -> SQLite -> CLI/API -> React
+HAR -> Go importer -> normalizer -> endpoint/session/dependency analyzers -> SQLite -> workflow graph -> API -> React
 ```
 
 See `docs/architecture.md` and `docs/data-flow.md`.
@@ -55,6 +55,7 @@ curl http://localhost:8080/api/v1/analyses/{id}
 curl http://localhost:8080/api/v1/analyses/{id}/endpoints
 curl http://localhost:8080/api/v1/analyses/{id}/sessions
 curl http://localhost:8080/api/v1/analyses/{id}/dependencies
+curl http://localhost:8080/api/v1/analyses/{id}/workflow
 ```
 
 ## Dependency Inference
@@ -62,6 +63,13 @@ curl http://localhost:8080/api/v1/analyses/{id}/dependencies
 Dependency inference is deterministic observable data-flow inference. It reports exact reuse of scalar values from earlier JSON responses in later request paths, query parameters, JSON request bodies, and `application/x-www-form-urlencoded` bodies.
 
 It does not prove application semantics, inspect request headers, infer session dependencies, decode JWTs, parse HTML/XML, or analyze multipart bodies. Matched values are not stored in dependency records or returned by the dependency API.
+
+
+## Workflow Graph
+
+The workflow graph is derived on retrieval from captured request instances and deterministic dependency inference. It includes one node per request and data-dependency edges where T3 found exact response-to-request value reuse.
+
+The workflow graph represents observable client-side request relationships, not the application's complete internal execution graph. It does not persist a separate graph blob or expose request bodies, response bodies, raw headers, or matched values.
 
 ## Development
 
@@ -94,7 +102,7 @@ Captured credentials may exist inside HAR input. Do not import sensitive product
 
 ## Project Status
 
-Initial analysis baseline. The next useful backend additions are workflow graph assembly and explicit replay with redaction.
+Current analysis baseline includes derived workflow graph visualization. The next useful backend addition is explicit replay with redaction.
 
 ## License
 

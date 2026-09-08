@@ -24,6 +24,11 @@ SQLite
   |
   +--> CLI summary
   |
+  +--> Workflow Graph Builder
+  |       |
+  |       v
+  |     HTTP API
+  |
   v
 HTTP API
   |
@@ -36,3 +41,5 @@ Endpoint normalization keeps method, host, and path. Query values are retained o
 Sensitive headers are normalized into safe metadata before analysis and storage. Cookie names and Set-Cookie attributes may be retained; token and cookie values are discarded.
 
 Dependency inference compares scalar values from earlier JSON responses against later request path segments, query values, JSON request body scalars, and form body values. Dependency records store request IDs, source JSON paths, target locations, target paths, confidence, and reason codes, not the matched values.
+
+Workflow graph construction loads exchanges and dependencies, creates one node per captured request, and creates data-dependency edges from dependency records only. Node order follows the same deterministic timestamp and stable capture-order semantics as dependency inference. The workflow graph represents observable client-side request relationships, not the application's complete internal execution graph.

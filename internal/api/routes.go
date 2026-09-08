@@ -9,6 +9,8 @@ import (
 )
 
 func registerRoutes(mux *http.ServeMux, store app.Store, importAnalysis *app.ImportAnalysis) {
+	getWorkflow := app.NewGetWorkflowGraph(store)
+
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
@@ -83,6 +85,15 @@ func registerRoutes(mux *http.ServeMux, store app.Store, importAnalysis *app.Imp
 			return
 		}
 		writeJSON(w, http.StatusOK, toDependenciesResponse(dependencies))
+	})
+
+	mux.HandleFunc("GET /api/v1/analyses/{id}/workflow", func(w http.ResponseWriter, r *http.Request) {
+		workflow, err := getWorkflow.Execute(r.Context(), r.PathValue("id"))
+		if err != nil {
+			writeAnalysisLoadError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, toWorkflowResponse(workflow))
 	})
 }
 
