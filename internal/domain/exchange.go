@@ -3,23 +3,23 @@ package domain
 import "time"
 
 type Request struct {
-	ID        string              `json:"id"`
-	Method    string              `json:"method"`
-	URL       string              `json:"url"`
-	Headers   map[string]string   `json:"headers"`
-	Query     map[string][]string `json:"query"`
-	Body      []byte              `json:"body,omitempty"`
-	Timestamp time.Time           `json:"timestamp"`
+	ID        string
+	Method    string
+	URL       string
+	Headers   map[string]string
+	Query     map[string][]string
+	Body      []byte
+	Timestamp time.Time
 }
 
 type Response struct {
-	StatusCode int               `json:"statusCode"`
-	Headers    map[string]string `json:"headers"`
-	Body       []byte            `json:"body,omitempty"`
-	Duration   time.Duration     `json:"duration"`
+	StatusCode int
+	Headers    map[string]string
+	Body       []byte
+	Duration   time.Duration
 }
 
 type Exchange struct {
-	Request  Request  `json:"request"`
-	Response Response `json:"response"`
+	Request  Request
+	Response Response
 }

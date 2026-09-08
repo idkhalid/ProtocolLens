@@ -3,6 +3,7 @@ package normalize
 import (
 	"encoding/base64"
 	"fmt"
+	"net"
 	"net/textproto"
 	"net/url"
 	"strings"
@@ -18,6 +19,9 @@ func FromHAR(entries []har.Entry) ([]domain.Exchange, error) {
 		u, err := url.Parse(entry.Request.URL)
 		if err != nil {
 			return nil, fmt.Errorf("parse request URL %q: %w", entry.Request.URL, err)
+		}
+		if u.Scheme == "" || u.Host == "" {
+			return nil, fmt.Errorf("request URL must be absolute: %q", entry.Request.URL)
 		}
 
 		timestamp, _ := time.Parse(time.RFC3339Nano, entry.StartedDateTime)
@@ -39,7 +43,7 @@ func FromHAR(entries []har.Entry) ([]domain.Exchange, error) {
 				StatusCode: entry.Response.Status,
 				Headers:    headers(entry.Response.Headers),
 				Body:       responseBody(entry.Response.Content),
-				Duration:   time.Duration(entry.Time * float64(time.Millisecond)),
+				Duration:   duration(entry.Time),
 			},
 		})
 	}
@@ -51,15 +55,37 @@ func EndpointOf(request domain.Request) (domain.Endpoint, error) {
 	if err != nil {
 		return domain.Endpoint{}, err
 	}
+	if u.Scheme == "" || u.Host == "" {
+		return domain.Endpoint{}, fmt.Errorf("request URL must be absolute: %q", request.URL)
+	}
 	path := u.EscapedPath()
 	if path == "" {
 		path = "/"
 	}
 	return domain.Endpoint{
 		Method: strings.ToUpper(request.Method),
-		Host:   strings.ToLower(u.Host),
+		Host:   host(u),
 		Path:   path,
 	}, nil
+}
+
+func host(u *url.URL) string {
+	name := strings.ToLower(u.Hostname())
+	port := u.Port()
+	if port == "" || (u.Scheme == "http" && port == "80") || (u.Scheme == "https" && port == "443") {
+		return name
+	}
+	if strings.Contains(name, ":") {
+		return net.JoinHostPort(name, port)
+	}
+	return name + ":" + port
+}
+
+func duration(ms float64) time.Duration {
+	if ms <= 0 {
+		return 0
+	}
+	return time.Duration(ms * float64(time.Millisecond))
 }
 
 func headers(values []har.NameValue) map[string]string {
@@ -69,9 +95,24 @@ func headers(values []har.NameValue) map[string]string {
 		if name == "" {
 			continue
 		}
-		out[textproto.CanonicalMIMEHeaderKey(name)] = header.Value
+		canonical := textproto.CanonicalMIMEHeaderKey(name)
+		out[canonical] = redactHeader(canonical, header.Value)
 	}
 	return out
+}
+
+func redactHeader(name, value string) string {
+	switch name {
+	case "Authorization":
+		if strings.HasPrefix(strings.ToLower(value), "bearer ") {
+			return "Bearer <REDACTED>"
+		}
+		return "<REDACTED>"
+	case "Cookie", "Proxy-Authorization", "Set-Cookie", "X-Api-Key", "X-Csrf-Token", "X-Xsrf-Token":
+		return "<REDACTED>"
+	default:
+		return value
+	}
 }
 
 func requestBody(postData *har.PostData) []byte {

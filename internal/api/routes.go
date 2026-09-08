@@ -1,10 +1,11 @@
 package api
 
 import (
-	"database/sql"
+	"errors"
 	"net/http"
 
 	"protocollens/internal/app"
+	"protocollens/internal/domain"
 )
 
 func registerRoutes(mux *http.ServeMux, store app.Store, importAnalysis *app.ImportAnalysis) {
@@ -18,7 +19,7 @@ func registerRoutes(mux *http.ServeMux, store app.Store, importAnalysis *app.Imp
 			writeError(w, http.StatusBadRequest, "invalid_har", "HAR file could not be parsed")
 			return
 		}
-		writeJSON(w, http.StatusCreated, analysis)
+		writeJSON(w, http.StatusCreated, toAnalysisResponse(analysis))
 	})
 
 	mux.HandleFunc("GET /api/v1/analyses", func(w http.ResponseWriter, r *http.Request) {
@@ -27,7 +28,7 @@ func registerRoutes(mux *http.ServeMux, store app.Store, importAnalysis *app.Imp
 			writeError(w, http.StatusInternalServerError, "storage_error", "Analyses could not be loaded")
 			return
 		}
-		writeJSON(w, http.StatusOK, analyses)
+		writeJSON(w, http.StatusOK, toAnalysisResponses(analyses))
 	})
 
 	mux.HandleFunc("GET /api/v1/analyses/{id}", func(w http.ResponseWriter, r *http.Request) {
@@ -36,7 +37,7 @@ func registerRoutes(mux *http.ServeMux, store app.Store, importAnalysis *app.Imp
 			status := http.StatusInternalServerError
 			code := "storage_error"
 			message := "Analysis could not be loaded"
-			if err == sql.ErrNoRows {
+			if errors.Is(err, domain.ErrNotFound) {
 				status = http.StatusNotFound
 				code = "not_found"
 				message = "Analysis was not found"
@@ -44,15 +45,29 @@ func registerRoutes(mux *http.ServeMux, store app.Store, importAnalysis *app.Imp
 			writeError(w, status, code, message)
 			return
 		}
-		writeJSON(w, http.StatusOK, analysis)
+		writeJSON(w, http.StatusOK, toAnalysisResponse(analysis))
 	})
 
 	mux.HandleFunc("GET /api/v1/analyses/{id}/endpoints", func(w http.ResponseWriter, r *http.Request) {
-		endpoints, err := store.ListEndpoints(r.Context(), r.PathValue("id"))
+		analysisID := r.PathValue("id")
+		if _, err := store.GetAnalysis(r.Context(), analysisID); err != nil {
+			status := http.StatusInternalServerError
+			code := "storage_error"
+			message := "Analysis could not be loaded"
+			if errors.Is(err, domain.ErrNotFound) {
+				status = http.StatusNotFound
+				code = "not_found"
+				message = "Analysis was not found"
+			}
+			writeError(w, status, code, message)
+			return
+		}
+
+		endpoints, err := store.ListEndpoints(r.Context(), analysisID)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "storage_error", "Endpoints could not be loaded")
 			return
 		}
-		writeJSON(w, http.StatusOK, endpoints)
+		writeJSON(w, http.StatusOK, toEndpointResponses(endpoints))
 	})
 }

@@ -2,7 +2,9 @@ package sqlite
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -89,7 +91,11 @@ func (s *Store) GetAnalysis(ctx context.Context, id string) (domain.Analysis, er
 SELECT id, created_at, request_count, endpoint_count, import_duration_ms
 FROM analyses
 WHERE id = ?`, id)
-	return scanAnalysis(row)
+	analysis, err := scanAnalysis(row)
+	if errors.Is(err, sql.ErrNoRows) {
+		return domain.Analysis{}, domain.ErrNotFound
+	}
+	return analysis, err
 }
 
 func (s *Store) ListAnalyses(ctx context.Context) ([]domain.Analysis, error) {

@@ -78,7 +78,7 @@ docker compose up --build
 
 ## Security Boundaries
 
-Imported HAR files are untrusted input and are size-limited. Request and response bodies are trimmed before normalization. Replay, code generation, authentication bypass, browser impersonation, CAPTCHA solving, and token validation are not implemented in this milestone.
+Imported HAR files are untrusted input and are size-limited. Request and response bodies are trimmed before normalization. Sensitive headers such as `Authorization`, `Cookie`, and `Set-Cookie` are redacted during normalization. Replay, code generation, authentication bypass, browser impersonation, CAPTCHA solving, and token validation are not implemented in this milestone.
 
 Captured credentials may exist inside HAR input. Do not import sensitive production traffic unless it has been sanitized.
 

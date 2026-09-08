@@ -38,3 +38,24 @@ func TestImportHARFlow(t *testing.T) {
 		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
 	}
 }
+
+func TestEndpointsMissingAnalysisReturnsNotFound(t *testing.T) {
+	ctx := context.Background()
+	store, err := sqlite.Open(ctx, t.TempDir()+"/api.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	importAnalysis := app.NewImportAnalysis(har.NewImporter(1024*1024), store)
+	mux := http.NewServeMux()
+	registerRoutes(mux, store, importAnalysis)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/analyses/missing/endpoints", nil)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
+	}
+}
