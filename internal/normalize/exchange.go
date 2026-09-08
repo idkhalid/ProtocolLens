@@ -4,8 +4,10 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net"
+	"net/http"
 	"net/textproto"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 
@@ -88,30 +90,106 @@ func duration(ms float64) time.Duration {
 	return time.Duration(ms * float64(time.Millisecond))
 }
 
-func headers(values []har.NameValue) map[string]string {
-	out := make(map[string]string, len(values))
+func headers(values []har.NameValue) map[string][]string {
+	out := make(map[string][]string, len(values))
 	for _, header := range values {
 		name := strings.TrimSpace(header.Name)
 		if name == "" {
 			continue
 		}
 		canonical := textproto.CanonicalMIMEHeaderKey(name)
-		out[canonical] = redactHeader(canonical, header.Value)
+		value, ok := safeHeader(canonical, header.Value)
+		if ok {
+			out[canonical] = append(out[canonical], value)
+		}
 	}
 	return out
 }
 
-func redactHeader(name, value string) string {
+func safeHeader(name, value string) (string, bool) {
 	switch name {
 	case "Authorization":
 		if strings.HasPrefix(strings.ToLower(value), "bearer ") {
-			return "Bearer <REDACTED>"
+			return "Bearer <REDACTED>", true
 		}
-		return "<REDACTED>"
-	case "Cookie", "Proxy-Authorization", "Set-Cookie", "X-Api-Key", "X-Csrf-Token", "X-Xsrf-Token":
-		return "<REDACTED>"
+		return "<REDACTED>", true
+	case "Cookie":
+		names := cookieNames(value)
+		if len(names) == 0 {
+			return "", false
+		}
+		return strings.Join(names, "; "), true
+	case "Set-Cookie":
+		return setCookieMetadata(value)
+	case "Proxy-Authorization", "X-Api-Key", "Api-Key", "X-Csrf-Token", "X-Csrftoken", "X-Xsrf-Token", "X-Xsrftoken", "Csrf-Token":
+		return "<REDACTED>", true
 	default:
-		return value
+		return value, true
+	}
+}
+
+func cookieNames(value string) []string {
+	seen := map[string]bool{}
+	var names []string
+	for _, part := range strings.Split(value, ";") {
+		name, _, ok := strings.Cut(strings.TrimSpace(part), "=")
+		name = strings.TrimSpace(name)
+		if ok && name != "" && !seen[name] {
+			seen[name] = true
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+	return names
+}
+
+func setCookieMetadata(value string) (string, bool) {
+	first, _, _ := strings.Cut(value, ";")
+	if !strings.Contains(first, "=") {
+		return "", false
+	}
+	response := http.Response{Header: http.Header{"Set-Cookie": []string{value}}}
+	cookies := response.Cookies()
+	if len(cookies) == 0 || cookies[0].Name == "" {
+		return "", false
+	}
+
+	cookie := cookies[0]
+	parts := []string{cookie.Name}
+	if cookie.Path != "" {
+		parts = append(parts, "Path="+cookie.Path)
+	}
+	if cookie.Domain != "" {
+		parts = append(parts, "Domain="+cookie.Domain)
+	}
+	if cookie.HttpOnly {
+		parts = append(parts, "HttpOnly")
+	}
+	if cookie.Secure {
+		parts = append(parts, "Secure")
+	}
+	if value := sameSite(cookie.SameSite); value != "" {
+		parts = append(parts, "SameSite="+value)
+	}
+	if cookie.MaxAge != 0 {
+		parts = append(parts, "Max-Age")
+	}
+	if !cookie.Expires.IsZero() {
+		parts = append(parts, "Expires")
+	}
+	return strings.Join(parts, "; "), true
+}
+
+func sameSite(value http.SameSite) string {
+	switch value {
+	case http.SameSiteLaxMode:
+		return "Lax"
+	case http.SameSiteStrictMode:
+		return "Strict"
+	case http.SameSiteNoneMode:
+		return "None"
+	default:
+		return ""
 	}
 }
 

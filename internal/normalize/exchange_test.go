@@ -86,16 +86,39 @@ func TestFromHARRedactsSensitiveHeaders(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if exchanges[0].Request.Headers["Authorization"] != "Bearer <REDACTED>" {
+	if exchanges[0].Request.Headers["Authorization"][0] != "Bearer <REDACTED>" {
 		t.Fatalf("authorization = %q", exchanges[0].Request.Headers["Authorization"])
 	}
-	if exchanges[0].Request.Headers["Cookie"] != "<REDACTED>" {
+	if exchanges[0].Request.Headers["Cookie"][0] != "session" {
 		t.Fatalf("cookie = %q", exchanges[0].Request.Headers["Cookie"])
 	}
-	if exchanges[0].Request.Headers["Accept"] != "application/json" {
+	if exchanges[0].Request.Headers["Accept"][0] != "application/json" {
 		t.Fatalf("accept = %q", exchanges[0].Request.Headers["Accept"])
 	}
-	if exchanges[0].Response.Headers["Set-Cookie"] != "<REDACTED>" {
+	if exchanges[0].Response.Headers["Set-Cookie"][0] != "session" {
 		t.Fatalf("set-cookie = %q", exchanges[0].Response.Headers["Set-Cookie"])
+	}
+}
+
+func TestFromHARPreservesMultipleSetCookiesSafely(t *testing.T) {
+	exchanges, err := FromHAR([]har.Entry{{
+		Request: har.Request{Method: "GET", URL: "https://example.com/api/items"},
+		Response: har.Response{
+			Headers: []har.NameValue{
+				{Name: "Set-Cookie", Value: "session_id=fake-session-value; Path=/; HttpOnly; Secure; SameSite=Lax"},
+				{Name: "set-cookie", Value: "theme=dark; Path=/"},
+				{Name: "Set-Cookie", Value: "malformed-cookie"},
+			},
+		},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := exchanges[0].Response.Headers["Set-Cookie"]
+	if len(got) != 2 {
+		t.Fatalf("set-cookie len = %d: %#v", len(got), got)
+	}
+	if got[0] != "session_id; Path=/; HttpOnly; Secure; SameSite=Lax" || got[1] != "theme; Path=/" {
+		t.Fatalf("set-cookie = %#v", got)
 	}
 }

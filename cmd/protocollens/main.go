@@ -40,10 +40,11 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fmt.Printf("analysis_id: %s\nrequests: %d\nendpoints: %d\nduration_ms: %d\n",
+	fmt.Printf("analysis_id: %s\nrequests: %d\nendpoints: %d\nsession_artifacts: %d\nduration_ms: %d\n",
 		analysis.ID,
 		analysis.RequestCount,
 		analysis.EndpointCount,
+		analysis.SessionCount,
 		analysis.ImportDuration,
 	)
 }

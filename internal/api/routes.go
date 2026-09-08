@@ -70,4 +70,27 @@ func registerRoutes(mux *http.ServeMux, store app.Store, importAnalysis *app.Imp
 		}
 		writeJSON(w, http.StatusOK, toEndpointResponses(endpoints))
 	})
+
+	mux.HandleFunc("GET /api/v1/analyses/{id}/sessions", func(w http.ResponseWriter, r *http.Request) {
+		analysisID := r.PathValue("id")
+		if _, err := store.GetAnalysis(r.Context(), analysisID); err != nil {
+			status := http.StatusInternalServerError
+			code := "storage_error"
+			message := "Analysis could not be loaded"
+			if errors.Is(err, domain.ErrNotFound) {
+				status = http.StatusNotFound
+				code = "not_found"
+				message = "Analysis was not found"
+			}
+			writeError(w, status, code, message)
+			return
+		}
+
+		artifacts, err := store.ListSessionArtifacts(r.Context(), analysisID)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "storage_error", "Session artifacts could not be loaded")
+			return
+		}
+		writeJSON(w, http.StatusOK, toSessionArtifactsResponse(artifacts))
+	})
 }

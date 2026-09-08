@@ -7,5 +7,6 @@ type Analysis struct {
 	CreatedAt      time.Time
 	RequestCount   int
 	EndpointCount  int
+	SessionCount   int
 	ImportDuration int64
 }

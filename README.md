@@ -7,7 +7,8 @@ ProtocolLens is a Go-first developer tool for analyzing observable client-side w
 - Import HAR 1.2 JSON
 - Normalize requests and responses into Go domain models
 - Aggregate endpoints by method, host, and path
-- Persist analyses, exchanges, and endpoints in SQLite
+- Detect safe session artifact metadata for cookies, bearer authorization, CSRF headers, and API key headers
+- Persist analyses, exchanges, endpoints, and session artifacts in SQLite
 - Analyze HAR files from the CLI
 - Import and inspect analyses through the HTTP API
 - Upload HAR files and view endpoint summaries in React
@@ -17,7 +18,7 @@ ProtocolLens is a Go-first developer tool for analyzing observable client-side w
 The core product is Go. React is only a presentation layer.
 
 ```text
-HAR -> Go importer -> normalizer -> endpoint analyzer -> SQLite -> CLI/API -> React
+HAR -> Go importer -> normalizer -> endpoint/session analyzers -> SQLite -> CLI/API -> React
 ```
 
 See `docs/architecture.md` and `docs/data-flow.md`.
@@ -51,6 +52,7 @@ The command prints the analysis ID, request count, endpoint count, and import du
 curl -X POST --data-binary @examples/har/simple.har http://localhost:8080/api/v1/import/har
 curl http://localhost:8080/api/v1/analyses/{id}
 curl http://localhost:8080/api/v1/analyses/{id}/endpoints
+curl http://localhost:8080/api/v1/analyses/{id}/sessions
 ```
 
 ## Development

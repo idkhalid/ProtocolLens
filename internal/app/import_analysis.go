@@ -15,10 +15,11 @@ import (
 )
 
 type Store interface {
-	SaveAnalysis(ctx context.Context, analysis domain.Analysis, exchanges []domain.Exchange, endpoints []domain.EndpointSummary) error
+	SaveAnalysis(ctx context.Context, analysis domain.Analysis, exchanges []domain.Exchange, endpoints []domain.EndpointSummary, artifacts []domain.SessionArtifact) error
 	GetAnalysis(ctx context.Context, id string) (domain.Analysis, error)
 	ListAnalyses(ctx context.Context) ([]domain.Analysis, error)
 	ListEndpoints(ctx context.Context, analysisID string) ([]domain.EndpointSummary, error)
+	ListSessionArtifacts(ctx context.Context, analysisID string) ([]domain.SessionArtifact, error)
 }
 
 type ImportAnalysis struct {
@@ -42,15 +43,21 @@ func (uc *ImportAnalysis) Execute(ctx context.Context, input io.Reader) (domain.
 		return domain.Analysis{}, fmt.Errorf("normalize HAR: %w", err)
 	}
 	endpoints := analyzer.EndpointAnalyzer{}.Analyze(exchanges)
+	artifacts := analyzer.SessionAnalyzer{}.Analyze(exchanges)
 
 	analysis := domain.Analysis{
 		ID:             newID(),
 		CreatedAt:      time.Now().UTC(),
 		RequestCount:   len(exchanges),
 		EndpointCount:  len(endpoints),
+		SessionCount:   len(artifacts),
 		ImportDuration: time.Since(start).Milliseconds(),
 	}
-	if err := uc.store.SaveAnalysis(ctx, analysis, exchanges, endpoints); err != nil {
+	for n := range artifacts {
+		artifacts[n].ID = newID()
+		artifacts[n].AnalysisID = analysis.ID
+	}
+	if err := uc.store.SaveAnalysis(ctx, analysis, exchanges, endpoints, artifacts); err != nil {
 		return domain.Analysis{}, fmt.Errorf("save analysis: %w", err)
 	}
 	return analysis, nil

@@ -48,8 +48,10 @@ func (EndpointAnalyzer) Analyze(exchanges []domain.Exchange) []domain.EndpointSu
 		if exchange.Response.StatusCode != 0 {
 			agg.statusCodes[exchange.Response.StatusCode] = true
 		}
-		if contentType := exchange.Response.Headers["Content-Type"]; contentType != "" {
-			agg.contentTypes[contentType] = true
+		for _, contentType := range exchange.Response.Headers["Content-Type"] {
+			if contentType != "" {
+				agg.contentTypes[contentType] = true
+			}
 		}
 	}
 
@@ -64,7 +66,7 @@ func (EndpointAnalyzer) Analyze(exchanges []domain.Exchange) []domain.EndpointSu
 			AverageDurationMs: agg.totalMs / float64(agg.count),
 			MinDurationMs:     agg.minMs,
 			MaxDurationMs:     agg.maxMs,
-			ContentTypes:      strings(agg.contentTypes),
+			ContentTypes:      stringSet(agg.contentTypes),
 		})
 	}
 	sort.Slice(out, func(i, j int) bool {
@@ -88,7 +90,7 @@ func ints(values map[int]bool) []int {
 	return out
 }
 
-func strings(values map[string]bool) []string {
+func stringSet(values map[string]bool) []string {
 	out := make([]string, 0, len(values))
 	for value := range values {
 		out = append(out, value)
