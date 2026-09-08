@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import type { ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   createColumnHelper,
@@ -7,18 +8,22 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import { FileSearch, Upload } from 'lucide-react'
-import { getEndpoints, getSessions, importHAR, listAnalyses } from '../api/analyses'
-import type { Endpoint, SessionArtifact } from '../types/api'
+import { getDependencies, getEndpoints, getSessions, importHAR, listAnalyses } from '../api/analyses'
+import type { Dependency, Endpoint, SessionArtifact } from '../types/api'
 
 const endpointColumns = createColumnHelper<Endpoint>()
 const sessionColumns = createColumnHelper<SessionArtifact>()
+const dependencyColumns = createColumnHelper<Dependency>()
+
+type View = 'overview' | 'sessions' | 'dependencies'
 
 export function App() {
   const queryClient = useQueryClient()
-  const [view, setView] = useState<'overview' | 'sessions'>('overview')
+  const [view, setView] = useState<View>('overview')
   const [selectedAnalysisID, setSelectedAnalysisID] = useState('')
   const [selectedEndpoint, setSelectedEndpoint] = useState<Endpoint | null>(null)
   const [selectedArtifact, setSelectedArtifact] = useState<SessionArtifact | null>(null)
+  const [selectedDependency, setSelectedDependency] = useState<Dependency | null>(null)
 
   const analyses = useQuery({ queryKey: ['analyses'], queryFn: listAnalyses })
   const activeAnalysisID = selectedAnalysisID || analyses.data?.[0]?.id || ''
@@ -32,6 +37,11 @@ export function App() {
     queryFn: () => getSessions(activeAnalysisID),
     enabled: activeAnalysisID.length > 0,
   })
+  const dependencies = useQuery({
+    queryKey: ['dependencies', activeAnalysisID],
+    queryFn: () => getDependencies(activeAnalysisID),
+    enabled: activeAnalysisID.length > 0,
+  })
 
   const upload = useMutation({
     mutationFn: importHAR,
@@ -39,9 +49,11 @@ export function App() {
       setSelectedAnalysisID(analysis.id)
       setSelectedEndpoint(null)
       setSelectedArtifact(null)
+      setSelectedDependency(null)
       queryClient.invalidateQueries({ queryKey: ['analyses'] })
       queryClient.invalidateQueries({ queryKey: ['endpoints', analysis.id] })
       queryClient.invalidateQueries({ queryKey: ['sessions', analysis.id] })
+      queryClient.invalidateQueries({ queryKey: ['dependencies', analysis.id] })
     },
   })
 
@@ -59,12 +71,12 @@ export function App() {
     ],
     [],
   )
-
   const table = useReactTable({
     data: endpoints.data ?? [],
     columns: tableColumns,
     getCoreRowModel: getCoreRowModel(),
   })
+
   const sessionTableColumns = useMemo(
     () => [
       sessionColumns.accessor((row) => artifactType(row.type), { id: 'type', header: 'Type' }),
@@ -83,6 +95,24 @@ export function App() {
     columns: sessionTableColumns,
     getCoreRowModel: getCoreRowModel(),
   })
+
+  const dependencyTableColumns = useMemo(
+    () => [
+      dependencyColumns.accessor('sourceRequestId', { header: 'Source Request' }),
+      dependencyColumns.accessor('sourcePath', { header: 'Source Field' }),
+      dependencyColumns.accessor('targetRequestId', { header: 'Target Request' }),
+      dependencyColumns.accessor('targetLocation', { header: 'Target Location' }),
+      dependencyColumns.accessor('targetPath', { header: 'Target Field' }),
+      dependencyColumns.accessor('confidence', { header: 'Confidence' }),
+    ],
+    [],
+  )
+  const dependencyTable = useReactTable({
+    data: dependencies.data?.dependencies ?? [],
+    columns: dependencyTableColumns,
+    getCoreRowModel: getCoreRowModel(),
+  })
+
   const activeAnalysis = analyses.data?.find((analysis) => analysis.id === activeAnalysisID)
 
   return (
@@ -94,18 +124,9 @@ export function App() {
             ProtocolLens
           </div>
           <nav className="space-y-1 text-sm">
-            <button
-              className={`flex w-full items-center rounded-md px-3 py-2 text-left font-medium ${view === 'overview' ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-600'}`}
-              onClick={() => setView('overview')}
-            >
-              Overview
-            </button>
-            <button
-              className={`flex w-full items-center rounded-md px-3 py-2 text-left font-medium ${view === 'sessions' ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-600'}`}
-              onClick={() => setView('sessions')}
-            >
-              Sessions
-            </button>
+            <NavButton active={view === 'overview'} onClick={() => setView('overview')}>Overview</NavButton>
+            <NavButton active={view === 'sessions'} onClick={() => setView('sessions')}>Sessions</NavButton>
+            <NavButton active={view === 'dependencies'} onClick={() => setView('dependencies')}>Dependencies</NavButton>
           </nav>
         </aside>
 
@@ -138,10 +159,11 @@ export function App() {
             </div>
           ) : null}
 
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-4">
             <Metric label="Requests" value={activeAnalysis?.requestCount ?? 0} />
             <Metric label="Endpoints" value={activeAnalysis?.endpointCount ?? 0} />
             <Metric label="Session Artifacts" value={activeAnalysis?.sessionArtifactCount ?? 0} />
+            <Metric label="Dependencies" value={activeAnalysis?.dependencyCount ?? 0} />
           </div>
 
           {view === 'overview' ? (
@@ -153,21 +175,15 @@ export function App() {
                 colSpan={tableColumns.length}
                 onRowClick={(endpoint) => setSelectedEndpoint(endpoint)}
               />
-
               {selectedEndpoint ? (
-                <div className="rounded-md border border-slate-200 bg-white p-4">
-                  <h2 className="text-base font-semibold text-slate-950">
-                    {selectedEndpoint.method} {selectedEndpoint.path}
-                  </h2>
-                  <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-3">
-                    <Detail label="Host" value={selectedEndpoint.host} />
-                    <Detail label="Duration" value={`${selectedEndpoint.minDurationMs.toFixed(1)}-${selectedEndpoint.maxDurationMs.toFixed(1)} ms`} />
-                    <Detail label="Content types" value={selectedEndpoint.contentTypes.join(', ') || 'Unknown'} />
-                  </dl>
-                </div>
+                <Panel title={`${selectedEndpoint.method} ${selectedEndpoint.path}`}>
+                  <Detail label="Host" value={selectedEndpoint.host} />
+                  <Detail label="Duration" value={`${selectedEndpoint.minDurationMs.toFixed(1)}-${selectedEndpoint.maxDurationMs.toFixed(1)} ms`} />
+                  <Detail label="Content types" value={selectedEndpoint.contentTypes.join(', ') || 'Unknown'} />
+                </Panel>
               ) : null}
             </>
-          ) : (
+          ) : view === 'sessions' ? (
             <>
               <DataTable
                 table={sessionTable}
@@ -176,18 +192,29 @@ export function App() {
                 colSpan={sessionTableColumns.length}
                 onRowClick={(artifact) => setSelectedArtifact(artifact)}
               />
-
               {selectedArtifact ? (
-                <div className="rounded-md border border-slate-200 bg-white p-4">
-                  <h2 className="text-base font-semibold text-slate-950">
-                    {artifactType(selectedArtifact.type)} {selectedArtifact.name}
-                  </h2>
-                  <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-3">
-                    <Detail label="Source" value={selectedArtifact.source} />
-                    <Detail label="First request" value={selectedArtifact.firstRequestId} />
-                    <Detail label="Metadata" value={metadata(selectedArtifact.metadata)} />
-                  </dl>
-                </div>
+                <Panel title={`${artifactType(selectedArtifact.type)} ${selectedArtifact.name}`}>
+                  <Detail label="Source" value={selectedArtifact.source} />
+                  <Detail label="First request" value={selectedArtifact.firstRequestId} />
+                  <Detail label="Metadata" value={metadata(selectedArtifact.metadata)} />
+                </Panel>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <DataTable
+                table={dependencyTable}
+                empty={!dependencies.isLoading && dependencyTable.getRowModel().rows.length === 0}
+                emptyText="No dependencies yet."
+                colSpan={dependencyTableColumns.length}
+                onRowClick={(dependency) => setSelectedDependency(dependency)}
+              />
+              {selectedDependency ? (
+                <Panel title={`${selectedDependency.sourceRequestId} to ${selectedDependency.targetRequestId}`}>
+                  <Detail label="Reason" value={reason(selectedDependency.reason)} />
+                  <Detail label="Confidence" value={selectedDependency.confidence} />
+                  <Detail label="Capture order" value="source before target" />
+                </Panel>
               ) : null}
             </>
           )}
@@ -197,11 +224,31 @@ export function App() {
   )
 }
 
+function NavButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: string }) {
+  return (
+    <button
+      className={`flex w-full items-center rounded-md px-3 py-2 text-left font-medium ${active ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-600'}`}
+      onClick={onClick}
+    >
+      {children}
+    </button>
+  )
+}
+
 function Metric({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-md border border-slate-200 bg-white p-4">
       <div className="text-sm text-slate-500">{label}</div>
       <div className="mt-1 text-2xl font-semibold text-slate-950">{value}</div>
+    </div>
+  )
+}
+
+function Panel({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="rounded-md border border-slate-200 bg-white p-4">
+      <h2 className="text-base font-semibold text-slate-950">{title}</h2>
+      <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-3">{children}</dl>
     </div>
   )
 }
@@ -275,4 +322,19 @@ function metadata(value: Record<string, string> | undefined) {
   return Object.entries(value)
     .map(([key, item]) => `${key}: ${item}`)
     .join(', ')
+}
+
+function reason(value: string) {
+  switch (value) {
+    case 'response_json_to_path':
+      return 'response JSON to path'
+    case 'response_json_to_query':
+      return 'response JSON to query'
+    case 'response_json_to_json_body':
+      return 'response JSON to JSON body'
+    case 'response_json_to_form_body':
+      return 'response JSON to form body'
+    default:
+      return value
+  }
 }

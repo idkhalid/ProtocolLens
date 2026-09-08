@@ -17,6 +17,8 @@ Endpoint Analyzer
   |
   +--> Session Analyzer
   |
+  +--> Dependency Analyzer
+  |
   v
 SQLite
   |
@@ -32,3 +34,5 @@ React UI
 Endpoint normalization keeps method, host, and path. Query values are retained on the request but ignored for endpoint grouping, so `/api/items?page=1` and `/api/items?page=2` map to the same endpoint.
 
 Sensitive headers are normalized into safe metadata before analysis and storage. Cookie names and Set-Cookie attributes may be retained; token and cookie values are discarded.
+
+Dependency inference compares scalar values from earlier JSON responses against later request path segments, query values, JSON request body scalars, and form body values. Dependency records store request IDs, source JSON paths, target locations, target paths, confidence, and reason codes, not the matched values.

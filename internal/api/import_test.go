@@ -172,3 +172,116 @@ func TestSessionsEndpointExistingAnalysisWithNoArtifactsReturnsEmptyList(t *test
 		t.Fatalf("artifacts = %#v", response.Artifacts)
 	}
 }
+
+func TestDependenciesEndpointReturnsDependenciesWithoutMatchedValues(t *testing.T) {
+	ctx := context.Background()
+	store, err := sqlite.Open(ctx, t.TempDir()+"/api.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	importAnalysis := app.NewImportAnalysis(har.NewImporter(1024*1024), store)
+	mux := http.NewServeMux()
+	registerRoutes(mux, store, importAnalysis)
+
+	body := strings.NewReader(`{"log":{"entries":[
+		{"startedDateTime":"2026-01-02T03:04:05Z","time":10,
+		 "request":{"method":"GET","url":"https://example.com/api/source","headers":[]},
+		 "response":{"status":200,"headers":[{"name":"Content-Type","value":"application/json"}],"content":{"mimeType":"application/json","text":"{\"id\":\"dep_secret_12345\"}"}}},
+		{"startedDateTime":"2026-01-02T03:04:06Z","time":10,
+		 "request":{"method":"GET","url":"https://example.com/api/items/dep_secret_12345","headers":[]},
+		 "response":{"status":200,"headers":[]}}
+	]}}`)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/api/v1/import/har", body))
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
+	}
+
+	var analysis analysisResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &analysis); err != nil {
+		t.Fatal(err)
+	}
+	if analysis.DependencyCount != 1 {
+		t.Fatalf("dependency count = %d", analysis.DependencyCount)
+	}
+
+	w = httptest.NewRecorder()
+	mux.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/v1/analyses/"+analysis.ID+"/dependencies", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
+	}
+	if strings.Contains(w.Body.String(), "dep_secret_12345") {
+		t.Fatalf("response leaked matched value: %s", w.Body.String())
+	}
+
+	var response dependenciesResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if len(response.Dependencies) != 1 || response.Dependencies[0].TargetPath != "/api/items/{value}" {
+		t.Fatalf("dependencies = %#v", response.Dependencies)
+	}
+}
+
+func TestDependenciesEndpointMissingAnalysisReturnsNotFound(t *testing.T) {
+	ctx := context.Background()
+	store, err := sqlite.Open(ctx, t.TempDir()+"/api.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	importAnalysis := app.NewImportAnalysis(har.NewImporter(1024*1024), store)
+	mux := http.NewServeMux()
+	registerRoutes(mux, store, importAnalysis)
+
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/v1/analyses/missing/dependencies", nil))
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
+	}
+}
+
+func TestDependenciesEndpointExistingAnalysisWithNoDependenciesReturnsEmptyList(t *testing.T) {
+	ctx := context.Background()
+	store, err := sqlite.Open(ctx, t.TempDir()+"/api.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	importAnalysis := app.NewImportAnalysis(har.NewImporter(1024*1024), store)
+	mux := http.NewServeMux()
+	registerRoutes(mux, store, importAnalysis)
+
+	body := strings.NewReader(`{"log":{"entries":[{
+		"startedDateTime":"2026-01-02T03:04:05Z",
+		"time":15,
+		"request":{"method":"GET","url":"https://example.com/api/items","headers":[]},
+		"response":{"status":200,"headers":[]}
+	}]}}`)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/api/v1/import/har", body))
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
+	}
+
+	var analysis analysisResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &analysis); err != nil {
+		t.Fatal(err)
+	}
+	w = httptest.NewRecorder()
+	mux.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/v1/analyses/"+analysis.ID+"/dependencies", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
+	}
+	var response dependenciesResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if len(response.Dependencies) != 0 {
+		t.Fatalf("dependencies = %#v", response.Dependencies)
+	}
+}

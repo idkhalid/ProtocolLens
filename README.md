@@ -1,6 +1,6 @@
 # ProtocolLens
 
-ProtocolLens is a Go-first developer tool for analyzing observable client-side web workflows from browser traffic. The current milestone imports HAR files, normalizes HTTP exchanges, aggregates endpoints, stores results in SQLite, and exposes them through a CLI, HTTP API, and thin React UI.
+ProtocolLens is a Go-first developer tool for analyzing observable client-side web workflows from browser traffic. The current milestone imports HAR files, normalizes HTTP exchanges, aggregates endpoints, detects session artifacts, infers deterministic request dependencies, stores results in SQLite, and exposes them through a CLI, HTTP API, and thin React UI.
 
 ## Current Capabilities
 
@@ -8,17 +8,18 @@ ProtocolLens is a Go-first developer tool for analyzing observable client-side w
 - Normalize requests and responses into Go domain models
 - Aggregate endpoints by method, host, and path
 - Detect safe session artifact metadata for cookies, bearer authorization, CSRF headers, and API key headers
-- Persist analyses, exchanges, endpoints, and session artifacts in SQLite
+- Infer observable response JSON data reuse in later request paths, query values, JSON bodies, and form bodies
+- Persist analyses, exchanges, endpoints, session artifacts, and dependencies in SQLite
 - Analyze HAR files from the CLI
 - Import and inspect analyses through the HTTP API
-- Upload HAR files and view endpoint summaries in React
+- Upload HAR files and view endpoint, session, and dependency summaries in React
 
 ## Architecture
 
 The core product is Go. React is only a presentation layer.
 
 ```text
-HAR -> Go importer -> normalizer -> endpoint/session analyzers -> SQLite -> CLI/API -> React
+HAR -> Go importer -> normalizer -> endpoint/session/dependency analyzers -> SQLite -> CLI/API -> React
 ```
 
 See `docs/architecture.md` and `docs/data-flow.md`.
@@ -44,7 +45,7 @@ npm run dev
 protocollens analyze file.har
 ```
 
-The command prints the analysis ID, request count, endpoint count, and import duration.
+The command prints the analysis ID, request count, endpoint count, session artifact count, dependency count, and import duration.
 
 ## API Usage
 
@@ -53,7 +54,14 @@ curl -X POST --data-binary @examples/har/simple.har http://localhost:8080/api/v1
 curl http://localhost:8080/api/v1/analyses/{id}
 curl http://localhost:8080/api/v1/analyses/{id}/endpoints
 curl http://localhost:8080/api/v1/analyses/{id}/sessions
+curl http://localhost:8080/api/v1/analyses/{id}/dependencies
 ```
+
+## Dependency Inference
+
+Dependency inference is deterministic observable data-flow inference. It reports exact reuse of scalar values from earlier JSON responses in later request paths, query parameters, JSON request bodies, and `application/x-www-form-urlencoded` bodies.
+
+It does not prove application semantics, inspect request headers, infer session dependencies, decode JWTs, parse HTML/XML, or analyze multipart bodies. Matched values are not stored in dependency records or returned by the dependency API.
 
 ## Development
 
@@ -86,7 +94,7 @@ Captured credentials may exist inside HAR input. Do not import sensitive product
 
 ## Project Status
 
-Initial vertical slice. The next useful backend additions are session artifact detection, dependency inference, and explicit replay with redaction.
+Initial analysis baseline. The next useful backend additions are workflow graph assembly and explicit replay with redaction.
 
 ## License
 
