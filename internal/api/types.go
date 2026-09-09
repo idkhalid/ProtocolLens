@@ -110,6 +110,12 @@ type replayResponse struct {
 	Truncated     bool                `json:"truncated"`
 }
 
+type generateRequest struct {
+	AnalysisID string `json:"analysisId"`
+	RequestID  string `json:"requestId"`
+	Target     string `json:"target"`
+}
+
 func toAnalysisResponse(analysis domain.Analysis) analysisResponse {
 	return analysisResponse{ID: analysis.ID, CreatedAt: analysis.CreatedAt, RequestCount: analysis.RequestCount, EndpointCount: analysis.EndpointCount, SessionCount: analysis.SessionCount, DependencyCount: analysis.DependencyCount, ImportDuration: analysis.ImportDuration}
 }

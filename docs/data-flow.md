@@ -25,9 +25,12 @@ SQLite
   +--> CLI summary
   |
   +--> Workflow Graph Builder
+  |
+  +--> Safe Replay Template
   |       |
-  |       v
-  |     HTTP API
+  |       +--> Replay Executor
+  |       |
+  |       +--> Client Generator
   |
   v
 HTTP API
@@ -68,3 +71,26 @@ Limited response inspector
 ```
 
 Replay templates are derived from normalized exchanges and do not execute network traffic. Replay execution is explicit, disabled by default, SSRF-checked during dialing and redirects, size-limited, and not written to SQLite.
+
+## Client generation flow
+
+```text
+Captured request
+  |
+  v
+Safe replay template
+  |
+  v
+GenerateClient
+  |
+  +--> cURL
+  |
+  +--> Python httpx
+  |
+  +--> Go net/http
+  |
+  v
+Generated client code
+```
+
+Client generation reuses the same safe replay template used by HTTP Replay. Generators do not read raw HAR data directly. Discarded secrets are not recovered. Generation performs no outbound network requests. Generated output is not persisted. Sensitive values are represented through deterministic environment-variable references. Generation logic lives in the Go backend. React only selects the target, displays generated code, and handles copy interaction.

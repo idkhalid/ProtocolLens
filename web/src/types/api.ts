@@ -116,3 +116,12 @@ export type ReplayResponse = {
   contentType: string
   truncated: boolean
 }
+
+export type GeneratorTarget = 'curl' | 'python' | 'go'
+
+export type GeneratorOutput = {
+	target: GeneratorTarget
+	language: string
+	code: string
+	environmentVariables?: string[]
+}

@@ -22,10 +22,12 @@ ProtocolLens is a Go application with a React visualization layer. The backend o
 
 `internal/replay` owns safe HTTP replay execution. It validates schemes, ports, hostnames, resolved IP addresses, redirects, request size, response size, and response header redaction before returning an ephemeral result. Replay is disabled by default and is never persisted.
 
+`internal/generator` creates reproducible HTTP client code (cURL, Python httpx, Go net/http) from safe replay templates, replacing sensitive secrets with environment variable lookups.
+
 ## Frontend
 
 `web` is a Vite React app. It uploads HAR files and displays analysis summaries, endpoints, session artifacts, dependencies, and workflow graphs returned by the Go API. It may calculate display coordinates, but it does not parse HAR, infer protocol behavior, reconstruct dependencies, or calculate confidence.
 
 ## Deferred
 
-Generation, session edges, cookie lifecycle graphs, Playwright import, WebSocket/SSE analysis, JWT/OAuth inference, header dependency inference, multipart replay reconstruction, and authentication are intentionally absent until a real slice needs them.
+Session edges, cookie lifecycle graphs, Playwright import, WebSocket/SSE analysis, JWT/OAuth inference, header dependency inference, multipart replay reconstruction, and authentication are intentionally absent until a real slice needs them.

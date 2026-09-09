@@ -7,17 +7,19 @@ import (
 
 	"protocollens/internal/app"
 	"protocollens/internal/domain"
+	"protocollens/internal/generator"
 	"protocollens/internal/replay"
 )
 
 type replayRoutes struct {
 	GetTemplate     *app.GetReplayTemplate
 	Execute         *app.ExecuteReplay
+	GenerateClient  *app.GenerateClient
 	MaxRequestBytes int64
 }
 
-func NewReplayRoutes(getTemplate *app.GetReplayTemplate, execute *app.ExecuteReplay, maxRequestBytes int64) replayRoutes {
-	return replayRoutes{GetTemplate: getTemplate, Execute: execute, MaxRequestBytes: maxRequestBytes}
+func NewReplayRoutes(getTemplate *app.GetReplayTemplate, execute *app.ExecuteReplay, generateClient *app.GenerateClient, maxRequestBytes int64) replayRoutes {
+	return replayRoutes{GetTemplate: getTemplate, Execute: execute, GenerateClient: generateClient, MaxRequestBytes: maxRequestBytes}
 }
 func registerRoutes(mux *http.ServeMux, store app.Store, importAnalysis *app.ImportAnalysis, replayUseCases ...replayRoutes) {
 	getWorkflow := app.NewGetWorkflowGraph(store)
@@ -145,6 +147,27 @@ func registerRoutes(mux *http.ServeMux, store app.Store, importAnalysis *app.Imp
 			return
 		}
 		writeJSON(w, http.StatusOK, toReplayResponse(result))
+	})
+	mux.HandleFunc("POST /api/v1/generate", func(w http.ResponseWriter, r *http.Request) {
+		if replayUC.GenerateClient == nil {
+			writeError(w, http.StatusForbidden, "replay_disabled", "HTTP replay is disabled on this server")
+			return
+		}
+		var input generateRequest
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid_request", "Invalid JSON body")
+			return
+		}
+		output, err := replayUC.GenerateClient.Execute(r.Context(), input.AnalysisID, input.RequestID, generator.Target(input.Target))
+		if err != nil {
+			if errors.Is(err, generator.ErrUnsupportedTarget) {
+				writeError(w, http.StatusBadRequest, "unsupported_target", "Unsupported generator target")
+				return
+			}
+			writeAnalysisLoadError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, output)
 	})
 }
 

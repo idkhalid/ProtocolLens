@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Send } from 'lucide-react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { getReplayTemplate, getWorkflow, sendReplay } from '../../api/analyses'
+import { getReplayTemplate, getWorkflow, sendReplay, generateClient } from '../../api/analyses'
 import { EmptyState, MethodBadge, StatusCode, formatMs } from '../../components/workbench'
 import type { ReplayRequest, ReplayResponse, ReplayTemplate, WorkflowNode } from '../../types/api'
 
@@ -43,34 +43,103 @@ export function ReplayPage({ analysisID }: { analysisID: string }) {
 
   return (
     <div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(0,1fr)_420px]">
-      <section className="replay-panel">
-        <div className="replay-panel-header">Request Editor</div>
-        <label className="field-label">Captured request</label>
-        <select className="field-input" value={requestID} onChange={(event) => setRequestID(event.target.value)}>
-          {nodes.map((node) => <option key={node.id} value={node.requestId}>{requestLabel(node)}</option>)}
-        </select>
-        {selectedNode ? <div className="mt-2 flex items-center gap-2 text-xs text-[var(--muted)]"><MethodBadge method={selectedNode.method} /><span className="mono truncate">{selectedNode.host}{selectedNode.path}</span></div> : null}
-        {template.data?.requiresReview ? <div className="notice mt-3">Template contains redacted placeholders. Replace required values before sending.</div> : null}
-        {template.data && !template.data.bodyAvailable ? <div className="notice muted mt-3">Captured body was omitted: {template.data.bodyReason}. Provide a new body if needed.</div> : null}
+      <div className="flex flex-col gap-3 min-w-0">
+        <section className="replay-panel">
+          <div className="replay-panel-header">Request Editor</div>
+          <label className="field-label">Captured request</label>
+          <select className="field-input" value={requestID} onChange={(event) => setRequestID(event.target.value)}>
+            {nodes.map((node) => <option key={node.id} value={node.requestId}>{requestLabel(node)}</option>)}
+          </select>
+          {selectedNode ? <div className="mt-2 flex items-center gap-2 text-xs text-[var(--muted)]"><MethodBadge method={selectedNode.method} /><span className="mono truncate">{selectedNode.host}{selectedNode.path}</span></div> : null}
+          {template.data?.requiresReview ? <div className="notice mt-3">Template contains redacted placeholders. Replace required values before sending.</div> : null}
+          {template.data && !template.data.bodyAvailable ? <div className="notice muted mt-3">Captured body was omitted: {template.data.bodyReason}. Provide a new body if needed.</div> : null}
 
-        <div className="mt-3 grid gap-2 sm:grid-cols-[110px_minmax(0,1fr)]">
-          <select className="field-input" value={method} onChange={(event) => setMethod(event.target.value)}>{methods.map((item) => <option key={item}>{item}</option>)}</select>
-          <input className="field-input mono" value={url} onChange={(event) => setURL(event.target.value)} placeholder="https://example.com/api" />
-        </div>
-        <label className="field-label">Query</label>
-        <textarea className="field-textarea mono h-20" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="name=value" />
-        <label className="field-label">Headers JSON</label>
-        <textarea className="field-textarea mono h-32" value={headers} onChange={(event) => setHeaders(event.target.value)} />
-        <label className="field-label">Body</label>
-        <textarea className="field-textarea mono h-40" value={body} onChange={(event) => setBody(event.target.value)} />
-        <label className="mt-3 flex items-center gap-2 text-xs text-[var(--text)]"><input type="checkbox" checked={followRedirects} onChange={(event) => setFollowRedirects(event.target.checked)} /> Follow redirects</label>
-        <button className="mt-3 inline-flex h-8 items-center gap-2 rounded border border-[var(--accent)] bg-[var(--accent)] px-3 text-xs font-medium text-white disabled:opacity-50" type="button" disabled={replay.isPending || template.isLoading} onClick={() => replay.mutate(request())}>
-          <Send className="h-3.5 w-3.5" /> Send Request
-        </button>
-        {replay.error ? <div className="mt-3 border border-[var(--danger-border)] bg-[var(--danger-bg)] p-2 text-xs text-[var(--danger)]">{replay.error.message}</div> : null}
-      </section>
+          <div className="mt-3 grid gap-2 sm:grid-cols-[110px_minmax(0,1fr)]">
+            <select className="field-input" value={method} onChange={(event) => setMethod(event.target.value)}>{methods.map((item) => <option key={item}>{item}</option>)}</select>
+            <input className="field-input mono" value={url} onChange={(event) => setURL(event.target.value)} placeholder="https://example.com/api" />
+          </div>
+          <label className="field-label">Query</label>
+          <textarea className="field-textarea mono h-20" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="name=value" />
+          <label className="field-label">Headers JSON</label>
+          <textarea className="field-textarea mono h-32" value={headers} onChange={(event) => setHeaders(event.target.value)} />
+          <label className="field-label">Body</label>
+          <textarea className="field-textarea mono h-40" value={body} onChange={(event) => setBody(event.target.value)} />
+          <label className="mt-3 flex items-center gap-2 text-xs text-[var(--text)]"><input type="checkbox" checked={followRedirects} onChange={(event) => setFollowRedirects(event.target.checked)} /> Follow redirects</label>
+          <button className="mt-3 inline-flex h-8 items-center gap-2 rounded border border-[var(--accent)] bg-[var(--accent)] px-3 text-xs font-medium text-white disabled:opacity-50" type="button" disabled={replay.isPending || template.isLoading} onClick={() => replay.mutate(request())}>
+            <Send className="h-3.5 w-3.5" /> Send Request
+          </button>
+          {replay.error ? <div className="mt-3 border border-[var(--danger-border)] bg-[var(--danger-bg)] p-2 text-xs text-[var(--danger)]">{replay.error.message}</div> : null}
+        </section>
+        <GenerateClient analysisID={analysisID} requestID={requestID} />
+      </div>
       <ResponseInspector result={result} loading={replay.isPending} />
     </div>
+  )
+}
+
+function GenerateClient({ analysisID, requestID }: { analysisID: string; requestID: string }) {
+  const [target, setTarget] = useState<'curl' | 'python' | 'go'>('curl')
+  const [copied, setCopied] = useState(false)
+  const generator = useQuery({
+    queryKey: ['generate', analysisID, requestID, target],
+    queryFn: () => generateClient(analysisID, requestID, target),
+    enabled: analysisID.length > 0 && requestID.length > 0,
+  })
+
+  useEffect(() => setCopied(false), [generator.data?.code])
+
+  if (!analysisID || !requestID) return null
+
+  return (
+    <section className="replay-panel">
+      <div className="flex items-center justify-between mb-3">
+        <div className="replay-panel-header !mb-0">Generate Client</div>
+        <div className="flex gap-1">
+          {(['curl', 'python', 'go'] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTarget(t)}
+              className={`px-2 py-1 text-xs font-medium rounded ${target === t ? 'bg-[var(--accent)] text-white' : 'bg-[var(--muted-bg)] text-[var(--muted)] hover:text-[var(--text)]'}`}
+            >
+              {t === 'curl' ? 'cURL' : t === 'python' ? 'Python' : 'Go'}
+            </button>
+          ))}
+        </div>
+      </div>
+      {generator.isError ? (
+        <div className="notice danger">{generator.error.message}</div>
+      ) : generator.isLoading ? (
+        <div className="text-xs text-[var(--muted)]">Generating...</div>
+      ) : generator.data ? (
+        <div>
+          {generator.data.environmentVariables && generator.data.environmentVariables.length > 0 && (
+            <div className="mb-2 text-xs">
+              <span className="text-[var(--muted)]">Required environment variables:</span>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {generator.data.environmentVariables.map((env) => (
+                  <span key={env} className="px-1.5 py-0.5 rounded bg-[var(--muted-bg)] border border-[var(--border)] mono">{env}</span>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="relative group">
+            <pre className="p-3 bg-[var(--surface)] border border-[var(--border)] rounded text-xs mono overflow-x-auto whitespace-pre">
+              {generator.data.code}
+            </pre>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(generator.data.code)
+                setCopied(true)
+                setTimeout(() => setCopied(false), 2000)
+              }}
+              className="absolute top-2 right-2 px-2 py-1 text-xs rounded bg-[var(--accent)] text-white opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              {copied ? 'Copied' : 'Copy'}
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </section>
   )
 }
 

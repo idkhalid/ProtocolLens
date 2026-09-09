@@ -39,3 +39,11 @@ export function sendReplay(request: ReplayRequest) {
     body: JSON.stringify(request),
   })
 }
+
+export function generateClient(analysisId: string, requestId: string, target: string) {
+  return api<import('../types/api').GeneratorOutput>('/api/v1/generate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ analysisId, requestId, target }),
+  })
+}

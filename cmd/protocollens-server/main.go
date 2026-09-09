@@ -31,7 +31,9 @@ func main() {
 	importAnalysis := app.NewImportAnalysis(har.NewImporter(cfg.MaxUploadBytes), store)
 	policy := replay.NewDestinationPolicy(cfg.ReplayAllowedPorts)
 	executor := replay.NewExecutor(policy, cfg.ReplayTimeout, cfg.ReplayMaxRequestBytes, cfg.ReplayMaxResponseBytes)
-	replayRoutes := api.NewReplayRoutes(app.NewGetReplayTemplate(store), app.NewExecuteReplay(cfg.ReplayEnabled, executor, cfg.ReplayMaxConcurrent), cfg.ReplayMaxRequestBytes)
+	getTemplate := app.NewGetReplayTemplate(store)
+	generateClient := app.NewGenerateClient(getTemplate)
+	replayRoutes := api.NewReplayRoutes(getTemplate, app.NewExecuteReplay(cfg.ReplayEnabled, executor, cfg.ReplayMaxConcurrent), generateClient, cfg.ReplayMaxRequestBytes)
 	server := api.NewServer(cfg.Addr, logger, store, importAnalysis, replayRoutes)
 	logger.Info("starting server", "addr", cfg.Addr)
 	if err := server.Run(ctx); err != nil {
