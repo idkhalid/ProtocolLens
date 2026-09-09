@@ -1,15 +1,30 @@
 package api
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 
 	"protocollens/internal/app"
 	"protocollens/internal/domain"
+	"protocollens/internal/replay"
 )
 
-func registerRoutes(mux *http.ServeMux, store app.Store, importAnalysis *app.ImportAnalysis) {
+type replayRoutes struct {
+	GetTemplate     *app.GetReplayTemplate
+	Execute         *app.ExecuteReplay
+	MaxRequestBytes int64
+}
+
+func NewReplayRoutes(getTemplate *app.GetReplayTemplate, execute *app.ExecuteReplay, maxRequestBytes int64) replayRoutes {
+	return replayRoutes{GetTemplate: getTemplate, Execute: execute, MaxRequestBytes: maxRequestBytes}
+}
+func registerRoutes(mux *http.ServeMux, store app.Store, importAnalysis *app.ImportAnalysis, replayUseCases ...replayRoutes) {
 	getWorkflow := app.NewGetWorkflowGraph(store)
+	var replayUC replayRoutes
+	if len(replayUseCases) > 0 {
+		replayUC = replayUseCases[0]
+	}
 
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
@@ -48,7 +63,6 @@ func registerRoutes(mux *http.ServeMux, store app.Store, importAnalysis *app.Imp
 			writeAnalysisLoadError(w, err)
 			return
 		}
-
 		endpoints, err := store.ListEndpoints(r.Context(), analysisID)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "storage_error", "Endpoints could not be loaded")
@@ -63,7 +77,6 @@ func registerRoutes(mux *http.ServeMux, store app.Store, importAnalysis *app.Imp
 			writeAnalysisLoadError(w, err)
 			return
 		}
-
 		artifacts, err := store.ListSessionArtifacts(r.Context(), analysisID)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "storage_error", "Session artifacts could not be loaded")
@@ -78,7 +91,6 @@ func registerRoutes(mux *http.ServeMux, store app.Store, importAnalysis *app.Imp
 			writeAnalysisLoadError(w, err)
 			return
 		}
-
 		dependencies, err := store.ListDependencies(r.Context(), analysisID)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "storage_error", "Dependencies could not be loaded")
@@ -95,6 +107,45 @@ func registerRoutes(mux *http.ServeMux, store app.Store, importAnalysis *app.Imp
 		}
 		writeJSON(w, http.StatusOK, toWorkflowResponse(workflow))
 	})
+
+	mux.HandleFunc("GET /api/v1/analyses/{id}/requests/{requestID}/replay-template", func(w http.ResponseWriter, r *http.Request) {
+		if replayUC.GetTemplate == nil {
+			writeError(w, http.StatusForbidden, "replay_disabled", "HTTP replay is disabled on this server")
+			return
+		}
+		template, err := replayUC.GetTemplate.Execute(r.Context(), r.PathValue("id"), r.PathValue("requestID"))
+		if err != nil {
+			writeAnalysisLoadError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, template)
+	})
+
+	mux.HandleFunc("POST /api/v1/replay", func(w http.ResponseWriter, r *http.Request) {
+		if replayUC.Execute == nil {
+			writeError(w, http.StatusForbidden, "replay_disabled", "HTTP replay is disabled on this server")
+			return
+		}
+		limit := replayUC.MaxRequestBytes
+		if limit <= 0 {
+			limit = 1 << 20
+		}
+		var input replayRequest
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, limit+4096)).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid_replay_request", "Replay request is invalid")
+			return
+		}
+		if int64(len(input.Body)) > limit {
+			writeError(w, http.StatusRequestEntityTooLarge, "request_too_large", "Replay request body is too large")
+			return
+		}
+		result, err := replayUC.Execute.Execute(r.Context(), app.ReplayRequestFrom(input.Method, input.URL, input.Headers, input.Body, input.FollowRedirects))
+		if err != nil {
+			writeReplayError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, toReplayResponse(result))
+	})
 }
 
 func writeAnalysisLoadError(w http.ResponseWriter, err error) {
@@ -103,4 +154,27 @@ func writeAnalysisLoadError(w http.ResponseWriter, err error) {
 		return
 	}
 	writeError(w, http.StatusInternalServerError, "storage_error", "Analysis could not be loaded")
+}
+
+func writeReplayError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, app.ErrReplayDisabled):
+		writeError(w, http.StatusForbidden, "replay_disabled", "HTTP replay is disabled on this server")
+	case errors.Is(err, app.ErrReplayBusy):
+		writeError(w, http.StatusTooManyRequests, "replay_busy", "Replay executor is busy")
+	case errors.Is(err, replay.ErrRequestTooLarge):
+		writeError(w, http.StatusRequestEntityTooLarge, "request_too_large", "Replay request body is too large")
+	case errors.Is(err, replay.ErrUnsupportedScheme):
+		writeError(w, http.StatusBadRequest, "unsupported_scheme", "Replay URL scheme is not supported")
+	case errors.Is(err, replay.ErrPortBlocked):
+		writeError(w, http.StatusBadRequest, "port_blocked", "Replay destination port is not allowed")
+	case errors.Is(err, replay.ErrDestinationBlocked), errors.Is(err, replay.ErrLocalHostname), errors.Is(err, replay.ErrUserinfo):
+		writeError(w, http.StatusBadRequest, "destination_blocked", "Replay destination is blocked")
+	case errors.Is(err, replay.ErrTimeout):
+		writeError(w, http.StatusGatewayTimeout, "replay_timeout", "Replay request timed out")
+	case errors.Is(err, replay.ErrInvalidRequest):
+		writeError(w, http.StatusBadRequest, "invalid_replay_request", "Replay request is invalid")
+	default:
+		writeError(w, http.StatusBadGateway, "upstream_error", "Replay request failed")
+	}
 }

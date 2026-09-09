@@ -14,9 +14,9 @@ type Server struct {
 	httpServer *http.Server
 }
 
-func NewServer(addr string, logger *slog.Logger, store app.Store, importAnalysis *app.ImportAnalysis) *Server {
+func NewServer(addr string, logger *slog.Logger, store app.Store, importAnalysis *app.ImportAnalysis, replayUseCases ...replayRoutes) *Server {
 	mux := http.NewServeMux()
-	registerRoutes(mux, store, importAnalysis)
+	registerRoutes(mux, store, importAnalysis, replayUseCases...)
 
 	handler := cors(logRequests(logger, mux))
 	return &Server{

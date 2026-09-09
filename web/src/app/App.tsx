@@ -7,6 +7,7 @@ import { DependenciesPage, edgeLabel, reason } from '../features/dependencies/De
 import { EndpointsPage, endpointKey } from '../features/endpoints/EndpointsPage'
 import { OverviewPage } from '../features/overview/OverviewPage'
 import { SessionsPage, artifactType } from '../features/sessions/SessionsPage'
+import { ReplayPage } from '../features/replay/ReplayPage'
 import { WorkflowPage } from '../features/workflow/WorkflowPage'
 import type { Dependency, Endpoint, SessionArtifact, WorkflowEdge, WorkflowNode } from '../types/api'
 
@@ -84,6 +85,7 @@ export function App() {
       {view === 'sessions' ? <SessionsPage artifacts={sessions.data?.artifacts ?? []} loading={sessions.isLoading} selectedID={selectedArtifact?.id ?? ''} onSelect={setSelectedArtifact} /> : null}
       {view === 'dependencies' ? <DependenciesPage dependencies={dependencies.data?.dependencies ?? []} loading={dependencies.isLoading} selectedID={selectedDependency?.id ?? ''} onSelect={setSelectedDependency} /> : null}
       {view === 'workflow' ? <WorkflowPage graph={workflow.data} loading={workflow.isLoading} onSelectNode={(node) => setWorkflowSelection({ type: 'node', node })} onSelectEdge={(edge) => setWorkflowSelection({ type: 'edge', edge })} /> : null}
+      {view === 'replay' ? <ReplayPage analysisID={activeAnalysisID} /> : null}
     </AppShell>
   )
 }

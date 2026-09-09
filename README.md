@@ -24,6 +24,7 @@ ProtocolLens is a Go-first web workflow analysis toolkit that turns captured bro
 - SQLite persistence
 - Light/dark developer workbench UI with dense protocol tables and inspector panels
 - Responsive narrow/mobile layout
+- Explicit safe HTTP replay, disabled by default
 
 ## Architecture
 
@@ -75,6 +76,8 @@ Inferred dependencies describe observable client-side data flow. They are eviden
 - Session and token values are not exposed through analysis APIs.
 - Dependency records do not persist matched raw values.
 - Workflow graph metadata remains structural only.
+- HTTP replay is disabled by default and executes only after an explicit user action.
+- Replay execution is ephemeral; replay requests and responses are not persisted.
 
 ProtocolLens does not make HAR files inherently safe. Avoid importing sensitive production traffic unless it has been sanitized.
 
@@ -96,6 +99,14 @@ npm run dev
 
 Open the frontend at `http://localhost:5173`. The API listens on `http://localhost:8080`.
 
+
+Enable replay for local development only after reviewing the target network policy:
+
+```sh
+PROTOCOLLENS_REPLAY_ENABLED=true go run ./cmd/protocollens-server
+```
+
+Default replay limits are ports `80,443`, timeout `10s`, request body `1 MiB`, response body `2 MiB`, and four concurrent replay requests.
 Run a CLI analysis:
 
 ```sh
@@ -111,6 +122,8 @@ curl http://localhost:8080/api/v1/analyses/{id}/endpoints
 curl http://localhost:8080/api/v1/analyses/{id}/sessions
 curl http://localhost:8080/api/v1/analyses/{id}/dependencies
 curl http://localhost:8080/api/v1/analyses/{id}/workflow
+curl http://localhost:8080/api/v1/analyses/{id}/requests/{requestId}/replay-template
+curl -X POST http://localhost:8080/api/v1/replay
 ```
 
 This is not a complete API reference; it lists the main inspection endpoints currently implemented.
@@ -166,7 +179,7 @@ ProtocolLens is under active development.
 
 Current baseline includes HAR import, endpoint analysis, session artifact analysis, deterministic dependency inference, derived workflow graphs, SQLite persistence, CLI/API access, and a responsive React developer workbench.
 
-Planned work includes HTTP replay, client generators, Playwright capture, WebSocket/SSE analysis, and benchmark/browser-to-HTTP analysis.
+Planned work includes client generators, Playwright capture, WebSocket/SSE analysis, and benchmark/browser-to-HTTP analysis.
 
 ## License
 

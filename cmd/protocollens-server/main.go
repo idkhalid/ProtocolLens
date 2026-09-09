@@ -11,6 +11,7 @@ import (
 	"protocollens/internal/app"
 	"protocollens/internal/capture/har"
 	"protocollens/internal/config"
+	"protocollens/internal/replay"
 	"protocollens/internal/storage/sqlite"
 )
 
@@ -28,7 +29,10 @@ func main() {
 	defer store.Close()
 
 	importAnalysis := app.NewImportAnalysis(har.NewImporter(cfg.MaxUploadBytes), store)
-	server := api.NewServer(cfg.Addr, logger, store, importAnalysis)
+	policy := replay.NewDestinationPolicy(cfg.ReplayAllowedPorts)
+	executor := replay.NewExecutor(policy, cfg.ReplayTimeout, cfg.ReplayMaxRequestBytes, cfg.ReplayMaxResponseBytes)
+	replayRoutes := api.NewReplayRoutes(app.NewGetReplayTemplate(store), app.NewExecuteReplay(cfg.ReplayEnabled, executor, cfg.ReplayMaxConcurrent), cfg.ReplayMaxRequestBytes)
+	server := api.NewServer(cfg.Addr, logger, store, importAnalysis, replayRoutes)
 	logger.Info("starting server", "addr", cfg.Addr)
 	if err := server.Run(ctx); err != nil {
 		log.Fatal(err)

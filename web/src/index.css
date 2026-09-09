@@ -335,3 +335,68 @@ button {
     height: 54dvh;
   }
 }
+.replay-panel {
+  min-width: 0;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  padding: 0.75rem;
+}
+
+.replay-panel-header {
+  margin: -0.75rem -0.75rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-alt);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.field-label {
+  display: block;
+  margin-top: 0.75rem;
+  margin-bottom: 0.25rem;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.field-input,
+.field-textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--workspace);
+  color: var(--text);
+  font-size: 0.78rem;
+  outline: none;
+}
+
+.field-input {
+  height: 2rem;
+  padding: 0 0.5rem;
+}
+
+.field-textarea {
+  resize: vertical;
+  padding: 0.5rem;
+}
+
+.replay-headers {
+  min-width: 360px;
+}
+
+.response-body {
+  margin-top: 0.75rem;
+  max-height: 380px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  background: var(--workspace);
+  padding: 0.75rem;
+  color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 0.75rem;
+  line-height: 1.2rem;
+  white-space: pre-wrap;
+}

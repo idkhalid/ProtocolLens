@@ -43,3 +43,28 @@ Sensitive headers are normalized into safe metadata before analysis and storage.
 Dependency inference compares scalar values from earlier JSON responses against later request path segments, query values, JSON request body scalars, and form body values. Dependency records store request IDs, source JSON paths, target locations, target paths, confidence, and reason codes, not the matched values.
 
 Workflow graph construction loads exchanges and dependencies, creates one node per captured request, and creates data-dependency edges from dependency records only. Node order follows the same deterministic timestamp and stable capture-order semantics as dependency inference. The workflow graph represents observable client-side request relationships, not the application's complete internal execution graph.
+## Replay flow
+
+```text
+Captured request
+  |
+  v
+Safe replay template
+  |
+  v
+User review / edit
+  |
+  v
+POST /api/v1/replay
+  |
+  v
+Replay executor
+  |
+  v
+Destination policy + safe transport
+  |
+  v
+Limited response inspector
+```
+
+Replay templates are derived from normalized exchanges and do not execute network traffic. Replay execution is explicit, disabled by default, SSRF-checked during dialing and redirects, size-limited, and not written to SQLite.
