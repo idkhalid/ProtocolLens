@@ -25,6 +25,18 @@ npm run dev
 
 The frontend expects `VITE_API_URL`, defaulting to `http://localhost:8080`.
 
+## Browser Capture Adapter (Optional)
+
+```sh
+cd browser
+npm install
+npm run typecheck
+npm run build
+npx playwright install chromium
+```
+
+The compiled `browser/dist/capture.js` must exist before the CLI capture command can be used.
+
 ## Docker
 
 ```sh

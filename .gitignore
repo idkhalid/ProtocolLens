@@ -4,5 +4,9 @@ dist/
 node_modules/
 web/dist/
 web/node_modules/
+browser/dist/
+browser/node_modules/
+browser/test-results/
+browser/playwright-report/
 *.exe
 *.test

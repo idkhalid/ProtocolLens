@@ -100,6 +100,14 @@ npm run dev
 
 Open the frontend at `http://localhost:5173`. The API listens on `http://localhost:8080`.
 
+(Optional) To enable Playwright browser capture:
+
+```sh
+cd browser
+npm install
+npm run build
+npx playwright install chromium
+```
 
 Enable replay for local development only after reviewing the target network policy:
 
@@ -112,6 +120,12 @@ Run a CLI analysis:
 
 ```sh
 go run ./cmd/protocollens analyze examples/har/dependency.har
+```
+
+Run a CLI browser capture:
+
+```sh
+go run ./cmd/protocollens capture --headed --duration 5s https://example.com
 ```
 
 ## API examples
@@ -133,6 +147,7 @@ This is not a complete API reference; it lists the main inspection endpoints cur
 ## Project structure
 
 ```text
+browser/
 cmd/
 internal/
   analyzer/
@@ -179,9 +194,9 @@ See [docs/development.md](docs/development.md).
 
 ProtocolLens is under active development.
 
-Current baseline includes HAR import, endpoint analysis, session artifact analysis, deterministic dependency inference, derived workflow graphs, SQLite persistence, CLI/API access, safe HTTP replay, client generation, and a responsive React developer workbench.
+Current baseline includes HAR import, Playwright traffic capture, endpoint analysis, session artifact analysis, deterministic dependency inference, derived workflow graphs, SQLite persistence, CLI/API access, safe HTTP replay, client generation, and a responsive React developer workbench.
 
-Planned work includes Playwright capture, WebSocket/SSE analysis, and benchmark/browser-to-HTTP analysis.
+Planned work includes WebSocket/SSE analysis, and benchmark/browser-to-HTTP analysis.
 
 ## License
 
