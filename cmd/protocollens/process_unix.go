@@ -3,10 +3,7 @@
 package main
 
 import (
-	"os"
-	"os/exec"
 	"syscall"
-	"time"
 )
 
 func configureCaptureProcess(cmd *exec.Cmd) {
