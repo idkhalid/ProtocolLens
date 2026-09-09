@@ -1,5 +1,5 @@
 import { api } from './client'
-import type { Analysis, DependenciesResponse, Endpoint, SessionArtifactsResponse, WorkflowGraph, ReplayRequest, ReplayResponse, ReplayTemplate } from '../types/api'
+import type { Analysis, DependenciesResponse, Endpoint, SessionArtifactsResponse, WorkflowGraph, ReplayRequest, ReplayResponse, ReplayTemplate, Capabilities, CaptureRequest } from '../types/api'
 
 export function listAnalyses() {
   return api<Analysis[]>('/api/v1/analyses')
@@ -45,5 +45,17 @@ export function generateClient(analysisId: string, requestId: string, target: st
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ analysisId, requestId, target }),
+  })
+}
+export function getCapabilities() {
+  return api<Capabilities>('/api/v1/capabilities')
+}
+
+export function captureURL(request: CaptureRequest, signal?: AbortSignal) {
+  return api<Analysis>('/api/v1/local/capture', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+    signal,
   })
 }

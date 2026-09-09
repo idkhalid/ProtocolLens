@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { getDependencies, getEndpoints, getSessions, getWorkflow, importHAR, listAnalyses } from '../api/analyses'
+import { getCapabilities, getDependencies, getEndpoints, getSessions, getWorkflow, importHAR, listAnalyses } from '../api/analyses'
 import { AppShell, DetailPanel, InspectorSection, KeyValue, formatMs } from '../components/workbench'
 import type { View } from '../components/workbench'
 import { DependenciesPage, edgeLabel, reason } from '../features/dependencies/DependenciesPage'
@@ -8,6 +8,7 @@ import { EndpointsPage, endpointKey } from '../features/endpoints/EndpointsPage'
 import { OverviewPage } from '../features/overview/OverviewPage'
 import { SessionsPage, artifactType } from '../features/sessions/SessionsPage'
 import { ReplayPage } from '../features/replay/ReplayPage'
+import { CapturePage } from '../features/capture/CapturePage'
 import { WorkflowPage } from '../features/workflow/WorkflowPage'
 import type { Dependency, Endpoint, SessionArtifact, WorkflowEdge, WorkflowNode } from '../types/api'
 
@@ -37,6 +38,7 @@ export function App() {
   const sessions = useQuery({ queryKey: ['sessions', activeAnalysisID], queryFn: () => getSessions(activeAnalysisID), enabled: activeAnalysisID.length > 0 })
   const dependencies = useQuery({ queryKey: ['dependencies', activeAnalysisID], queryFn: () => getDependencies(activeAnalysisID), enabled: activeAnalysisID.length > 0 })
   const workflow = useQuery({ queryKey: ['workflow', activeAnalysisID], queryFn: () => getWorkflow(activeAnalysisID), enabled: activeAnalysisID.length > 0 })
+  const capabilities = useQuery({ queryKey: ['capabilities'], queryFn: getCapabilities })
 
   const clearSelection = () => {
     setSelectedEndpoint(null)
@@ -57,6 +59,16 @@ export function App() {
       queryClient.invalidateQueries({ queryKey: ['workflow', analysis.id] })
     },
   })
+
+  const onCaptured = (analysis: import('../types/api').Analysis) => {
+    setSelectedAnalysisID(analysis.id)
+    clearSelection()
+    queryClient.invalidateQueries({ queryKey: ['analyses'] })
+    queryClient.invalidateQueries({ queryKey: ['endpoints', analysis.id] })
+    queryClient.invalidateQueries({ queryKey: ['sessions', analysis.id] })
+    queryClient.invalidateQueries({ queryKey: ['dependencies', analysis.id] })
+    queryClient.invalidateQueries({ queryKey: ['workflow', analysis.id] })
+  }
 
   const counts = useMemo(() => ({
     requests: activeAnalysis?.requestCount ?? 0,
@@ -81,6 +93,7 @@ export function App() {
       detail={detailFor(view, selectedEndpoint, selectedArtifact, selectedDependency, workflowSelection)}
     >
       {view === 'overview' ? <OverviewPage analysis={activeAnalysis} /> : null}
+      {view === 'capture' ? <CapturePage capabilities={capabilities.data} onCaptured={onCaptured} onOpen={(id) => { setSelectedAnalysisID(id); setView('overview') }} /> : null}
       {view === 'endpoints' ? <EndpointsPage endpoints={endpoints.data ?? []} loading={endpoints.isLoading} selectedKey={endpointKey(selectedEndpoint)} onSelect={setSelectedEndpoint} /> : null}
       {view === 'sessions' ? <SessionsPage artifacts={sessions.data?.artifacts ?? []} loading={sessions.isLoading} selectedID={selectedArtifact?.id ?? ''} onSelect={setSelectedArtifact} /> : null}
       {view === 'dependencies' ? <DependenciesPage dependencies={dependencies.data?.dependencies ?? []} loading={dependencies.isLoading} selectedID={selectedDependency?.id ?? ''} onSelect={setSelectedDependency} /> : null}

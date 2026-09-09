@@ -2,6 +2,8 @@ package config
 
 import (
 	"log/slog"
+	"net"
+	"net/netip"
 	"os"
 	"strconv"
 	"strings"
@@ -20,6 +22,7 @@ type Config struct {
 	ReplayMaxRequestBytes  int64
 	ReplayMaxResponseBytes int64
 	ReplayMaxConcurrent    int
+	LocalCaptureEnabled    bool
 }
 
 func Load() Config {
@@ -35,7 +38,26 @@ func Load() Config {
 		ReplayMaxRequestBytes:  envInt64("PROTOCOLLENS_REPLAY_MAX_REQUEST_SIZE", 1<<20),
 		ReplayMaxResponseBytes: envInt64("PROTOCOLLENS_REPLAY_MAX_RESPONSE_SIZE", 2<<20),
 		ReplayMaxConcurrent:    int(envInt64("PROTOCOLLENS_REPLAY_MAX_CONCURRENT", 4)),
+		LocalCaptureEnabled:    envBool("PROTOCOLLENS_LOCAL_CAPTURE_ENABLED", false),
 	}
+}
+
+func LocalCaptureBindAllowed(addr string) bool {
+	host := strings.TrimSpace(addr)
+	if host == "" {
+		return false
+	}
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	} else if strings.HasPrefix(host, ":") {
+		return false
+	}
+	host = strings.TrimPrefix(strings.TrimSuffix(host, "]"), "[")
+	if host == "localhost" {
+		return true
+	}
+	addrIP, err := netip.ParseAddr(host)
+	return err == nil && addrIP.IsLoopback()
 }
 
 func env(name, fallback string) string {
