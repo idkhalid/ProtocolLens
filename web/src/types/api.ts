@@ -76,3 +76,43 @@ export type WorkflowGraph = {
   nodes: WorkflowNode[]
   edges: WorkflowEdge[]
 }
+
+export type ReplayTemplate = {
+  analysisId: string
+  requestId: string
+  method: string
+  url: string
+  scheme: string
+  host: string
+  port: string
+  path: string
+  query: Record<string, string[]>
+  headers: Record<string, string[]>
+  body: string
+  bodyAvailable: boolean
+  bodyReason?: string
+  contentType?: string
+  requiresReview: boolean
+}
+
+export type ReplayRequest = {
+  analysisId?: string
+  requestId?: string
+  method: string
+  url: string
+  headers: Record<string, string[]>
+  body: string
+  followRedirects: boolean
+}
+
+export type ReplayResponse = {
+  statusCode: number
+  durationMs: number
+  finalUrl: string
+  headers: Record<string, string[]>
+  body: string
+  bodyAvailable: boolean
+  contentLength: number
+  contentType: string
+  truncated: boolean
+}

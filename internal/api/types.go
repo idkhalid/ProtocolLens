@@ -5,6 +5,7 @@ import (
 
 	"protocollens/internal/domain"
 	"protocollens/internal/graph"
+	"protocollens/internal/replay"
 )
 
 type analysisResponse struct {
@@ -87,16 +88,30 @@ type workflowEdgeResponse struct {
 	TargetPath     string `json:"targetPath"`
 }
 
+type replayRequest struct {
+	AnalysisID      string              `json:"analysisId,omitempty"`
+	RequestID       string              `json:"requestId,omitempty"`
+	Method          string              `json:"method"`
+	URL             string              `json:"url"`
+	Headers         map[string][]string `json:"headers"`
+	Body            string              `json:"body"`
+	FollowRedirects bool                `json:"followRedirects"`
+}
+
+type replayResponse struct {
+	StatusCode    int                 `json:"statusCode"`
+	DurationMs    int64               `json:"durationMs"`
+	FinalURL      string              `json:"finalUrl"`
+	Headers       map[string][]string `json:"headers"`
+	Body          string              `json:"body"`
+	BodyAvailable bool                `json:"bodyAvailable"`
+	ContentLength int64               `json:"contentLength"`
+	ContentType   string              `json:"contentType"`
+	Truncated     bool                `json:"truncated"`
+}
+
 func toAnalysisResponse(analysis domain.Analysis) analysisResponse {
-	return analysisResponse{
-		ID:              analysis.ID,
-		CreatedAt:       analysis.CreatedAt,
-		RequestCount:    analysis.RequestCount,
-		EndpointCount:   analysis.EndpointCount,
-		SessionCount:    analysis.SessionCount,
-		DependencyCount: analysis.DependencyCount,
-		ImportDuration:  analysis.ImportDuration,
-	}
+	return analysisResponse{ID: analysis.ID, CreatedAt: analysis.CreatedAt, RequestCount: analysis.RequestCount, EndpointCount: analysis.EndpointCount, SessionCount: analysis.SessionCount, DependencyCount: analysis.DependencyCount, ImportDuration: analysis.ImportDuration}
 }
 
 func toAnalysisResponses(analyses []domain.Analysis) []analysisResponse {
@@ -110,16 +125,7 @@ func toAnalysisResponses(analyses []domain.Analysis) []analysisResponse {
 func toSessionArtifactsResponse(artifacts []domain.SessionArtifact) sessionArtifactsResponse {
 	out := make([]sessionArtifactResponse, len(artifacts))
 	for n, artifact := range artifacts {
-		out[n] = sessionArtifactResponse{
-			ID:             artifact.ID,
-			Type:           string(artifact.Type),
-			Name:           artifact.Name,
-			Source:         artifact.Source,
-			FirstRequestID: artifact.FirstRequestID,
-			FirstSeenAt:    artifact.FirstSeenAt,
-			Occurrences:    artifact.Occurrences,
-			Metadata:       artifact.Metadata,
-		}
+		out[n] = sessionArtifactResponse{ID: artifact.ID, Type: string(artifact.Type), Name: artifact.Name, Source: artifact.Source, FirstRequestID: artifact.FirstRequestID, FirstSeenAt: artifact.FirstSeenAt, Occurrences: artifact.Occurrences, Metadata: artifact.Metadata}
 	}
 	return sessionArtifactsResponse{Artifacts: out}
 }
@@ -127,16 +133,7 @@ func toSessionArtifactsResponse(artifacts []domain.SessionArtifact) sessionArtif
 func toDependenciesResponse(dependencies []domain.Dependency) dependenciesResponse {
 	out := make([]dependencyResponse, len(dependencies))
 	for n, dependency := range dependencies {
-		out[n] = dependencyResponse{
-			ID:              dependency.ID,
-			SourceRequestID: dependency.SourceRequestID,
-			TargetRequestID: dependency.TargetRequestID,
-			SourcePath:      dependency.SourcePath,
-			TargetLocation:  dependency.TargetLocation,
-			TargetPath:      dependency.TargetPath,
-			Confidence:      string(dependency.Confidence),
-			Reason:          dependency.Reason,
-		}
+		out[n] = dependencyResponse{ID: dependency.ID, SourceRequestID: dependency.SourceRequestID, TargetRequestID: dependency.TargetRequestID, SourcePath: dependency.SourcePath, TargetLocation: dependency.TargetLocation, TargetPath: dependency.TargetPath, Confidence: string(dependency.Confidence), Reason: dependency.Reason}
 	}
 	return dependenciesResponse{Dependencies: out}
 }
@@ -144,30 +141,11 @@ func toDependenciesResponse(dependencies []domain.Dependency) dependenciesRespon
 func toWorkflowResponse(workflow graph.Graph) workflowResponse {
 	nodes := make([]workflowNodeResponse, len(workflow.Nodes))
 	for n, node := range workflow.Nodes {
-		nodes[n] = workflowNodeResponse{
-			ID:         node.ID,
-			RequestID:  node.RequestID,
-			Order:      node.Order,
-			Method:     node.Method,
-			Host:       node.Host,
-			Path:       node.Path,
-			StatusCode: node.StatusCode,
-			DurationMs: node.Duration.Milliseconds(),
-		}
+		nodes[n] = workflowNodeResponse{ID: node.ID, RequestID: node.RequestID, Order: node.Order, Method: node.Method, Host: node.Host, Path: node.Path, StatusCode: node.StatusCode, DurationMs: node.Duration.Milliseconds()}
 	}
 	edges := make([]workflowEdgeResponse, len(workflow.Edges))
 	for n, edge := range workflow.Edges {
-		edges[n] = workflowEdgeResponse{
-			ID:             edge.ID,
-			Source:         edge.Source,
-			Target:         edge.Target,
-			Type:           string(edge.Type),
-			Confidence:     string(edge.Confidence),
-			Reason:         edge.Reason,
-			SourcePath:     edge.SourcePath,
-			TargetLocation: edge.TargetLocation,
-			TargetPath:     edge.TargetPath,
-		}
+		edges[n] = workflowEdgeResponse{ID: edge.ID, Source: edge.Source, Target: edge.Target, Type: string(edge.Type), Confidence: string(edge.Confidence), Reason: edge.Reason, SourcePath: edge.SourcePath, TargetLocation: edge.TargetLocation, TargetPath: edge.TargetPath}
 	}
 	return workflowResponse{Nodes: nodes, Edges: edges}
 }
@@ -175,17 +153,11 @@ func toWorkflowResponse(workflow graph.Graph) workflowResponse {
 func toEndpointResponses(endpoints []domain.EndpointSummary) []endpointResponse {
 	out := make([]endpointResponse, len(endpoints))
 	for n, endpoint := range endpoints {
-		out[n] = endpointResponse{
-			Method:            endpoint.Method,
-			Host:              endpoint.Host,
-			Path:              endpoint.Path,
-			RequestCount:      endpoint.RequestCount,
-			StatusCodes:       endpoint.StatusCodes,
-			AverageDurationMs: endpoint.AverageDurationMs,
-			MinDurationMs:     endpoint.MinDurationMs,
-			MaxDurationMs:     endpoint.MaxDurationMs,
-			ContentTypes:      endpoint.ContentTypes,
-		}
+		out[n] = endpointResponse{Method: endpoint.Method, Host: endpoint.Host, Path: endpoint.Path, RequestCount: endpoint.RequestCount, StatusCodes: endpoint.StatusCodes, AverageDurationMs: endpoint.AverageDurationMs, MinDurationMs: endpoint.MinDurationMs, MaxDurationMs: endpoint.MaxDurationMs, ContentTypes: endpoint.ContentTypes}
 	}
 	return out
+}
+
+func toReplayResponse(result replay.Result) replayResponse {
+	return replayResponse{StatusCode: result.StatusCode, DurationMs: result.Duration.Milliseconds(), FinalURL: result.FinalURL, Headers: result.Headers, Body: string(result.Body), BodyAvailable: result.BodyAvailable, ContentLength: result.ContentLength, ContentType: result.ContentType, Truncated: result.Truncated}
 }

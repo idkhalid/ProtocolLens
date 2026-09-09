@@ -32,3 +32,29 @@ docker compose up --build
 ```
 
 The API stores SQLite data in `./data`.
+
+## HTTP replay development
+
+Replay is disabled by default:
+
+```sh
+PROTOCOLLENS_REPLAY_ENABLED=false
+```
+
+For local development against allowed public destinations:
+
+```sh
+PROTOCOLLENS_REPLAY_ENABLED=true go run ./cmd/protocollens-server
+```
+
+Replay configuration:
+
+```sh
+PROTOCOLLENS_REPLAY_ALLOWED_PORTS=80,443
+PROTOCOLLENS_REPLAY_TIMEOUT=10s
+PROTOCOLLENS_REPLAY_MAX_REQUEST_SIZE=1048576
+PROTOCOLLENS_REPLAY_MAX_RESPONSE_SIZE=2097152
+PROTOCOLLENS_REPLAY_MAX_CONCURRENT=4
+```
+
+Public deployments should evaluate replay carefully. Even with SSRF checks and response limits, enabling replay on a public instance can create an outbound HTTP relay surface.

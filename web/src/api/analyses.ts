@@ -1,5 +1,5 @@
 import { api } from './client'
-import type { Analysis, DependenciesResponse, Endpoint, SessionArtifactsResponse, WorkflowGraph } from '../types/api'
+import type { Analysis, DependenciesResponse, Endpoint, SessionArtifactsResponse, WorkflowGraph, ReplayRequest, ReplayResponse, ReplayTemplate } from '../types/api'
 
 export function listAnalyses() {
   return api<Analysis[]>('/api/v1/analyses')
@@ -26,5 +26,16 @@ export function importHAR(file: File) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: file,
+  })
+}
+export function getReplayTemplate(analysisID: string, requestID: string) {
+  return api<ReplayTemplate>(`/api/v1/analyses/${analysisID}/requests/${requestID}/replay-template`)
+}
+
+export function sendReplay(request: ReplayRequest) {
+  return api<ReplayResponse>('/api/v1/replay', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
   })
 }
