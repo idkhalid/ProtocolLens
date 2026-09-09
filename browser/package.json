@@ -1,0 +1,18 @@
+{
+  "name": "protocollens-browser",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "capture": "ts-node src/capture.ts",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "playwright": "^1.42.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.0.0"
+  }
+}

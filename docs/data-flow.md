@@ -1,6 +1,12 @@
 # Data Flow
 
 ```text
+URL
+  |
+  v
+Playwright Capture Adapter
+  |
+  v
 HAR file
   |
   v

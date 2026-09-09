@@ -22,7 +22,11 @@ ProtocolLens is a Go application with a React visualization layer. The backend o
 
 `internal/replay` owns safe HTTP replay execution. It validates schemes, ports, hostnames, resolved IP addresses, redirects, request size, response size, and response header redaction before returning an ephemeral result. Replay is disabled by default and is never persisted.
 
-`internal/generator` creates reproducible HTTP client code (cURL, Python httpx, Go net/http) from safe replay templates, replacing sensitive secrets with environment variable lookups.
+	`internal/generator` creates reproducible HTTP client code (cURL, Python httpx, Go net/http) from safe replay templates, replacing sensitive secrets with environment variable lookups.
+
+## Playwright Capture Adapter
+
+The `browser` directory contains a standalone TypeScript project acting purely as a local-first Playwright browser traffic capture adapter. It relies entirely on the Go analysis pipeline for endpoint, session, and dependency analysis. It performs no network analysis itself. Capture operates on a strict, limited duration, validates destination policy to prevent abuse, and outputs a temporary HAR file to be imported by the existing Go importer. The Go server does not require Playwright/Node installation for its primary functions.
 
 ## Frontend
 
@@ -30,4 +34,4 @@ ProtocolLens is a Go application with a React visualization layer. The backend o
 
 ## Deferred
 
-Session edges, cookie lifecycle graphs, Playwright import, WebSocket/SSE analysis, JWT/OAuth inference, header dependency inference, multipart replay reconstruction, and authentication are intentionally absent until a real slice needs them.
+Session edges, cookie lifecycle graphs, WebSocket/SSE analysis, JWT/OAuth inference, header dependency inference, multipart replay reconstruction, and authentication are intentionally absent until a real slice needs them.
