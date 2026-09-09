@@ -10,6 +10,7 @@ import (
 	"protocollens/internal/api"
 	"protocollens/internal/app"
 	"protocollens/internal/capture/har"
+	"protocollens/internal/capture/playwright"
 	"protocollens/internal/config"
 	"protocollens/internal/replay"
 	"protocollens/internal/storage/sqlite"
@@ -28,13 +29,18 @@ func main() {
 	}
 	defer store.Close()
 
+	if cfg.LocalCaptureEnabled && !config.LocalCaptureBindAllowed(cfg.Addr) {
+		log.Fatalf("local capture requires PROTOCOLLENS_ADDR to be loopback, got %q", cfg.Addr)
+	}
+
 	importAnalysis := app.NewImportAnalysis(har.NewImporter(cfg.MaxUploadBytes), store)
 	policy := replay.NewDestinationPolicy(cfg.ReplayAllowedPorts)
 	executor := replay.NewExecutor(policy, cfg.ReplayTimeout, cfg.ReplayMaxRequestBytes, cfg.ReplayMaxResponseBytes)
 	getTemplate := app.NewGetReplayTemplate(store)
 	generateClient := app.NewGenerateClient(getTemplate)
 	replayRoutes := api.NewReplayRoutes(getTemplate, app.NewExecuteReplay(cfg.ReplayEnabled, executor, cfg.ReplayMaxConcurrent), generateClient, cfg.ReplayMaxRequestBytes)
-	server := api.NewServer(cfg.Addr, logger, store, importAnalysis, replayRoutes)
+	localCapture := app.NewLocalCapture(cfg.LocalCaptureEnabled, playwright.Runner{Stdout: os.Stdout, Stderr: os.Stderr}, importAnalysis)
+	server := api.NewServerWithLocalCapture(cfg.Addr, logger, store, importAnalysis, api.NewLocalCaptureRoutes(cfg.Addr, cfg.ReplayAllowedPorts, localCapture), replayRoutes)
 	logger.Info("starting server", "addr", cfg.Addr)
 	if err := server.Run(ctx); err != nil {
 		log.Fatal(err)

@@ -15,8 +15,13 @@ type Server struct {
 }
 
 func NewServer(addr string, logger *slog.Logger, store app.Store, importAnalysis *app.ImportAnalysis, replayUseCases ...replayRoutes) *Server {
+	return NewServerWithLocalCapture(addr, logger, store, importAnalysis, LocalCaptureRoutes{Addr: addr}, replayUseCases...)
+}
+
+func NewServerWithLocalCapture(addr string, logger *slog.Logger, store app.Store, importAnalysis *app.ImportAnalysis, captureRoutes LocalCaptureRoutes, replayUseCases ...replayRoutes) *Server {
 	mux := http.NewServeMux()
 	registerRoutes(mux, store, importAnalysis, replayUseCases...)
+	registerLocalCaptureRoutes(mux, captureRoutes)
 
 	handler := cors(logRequests(logger, mux))
 	return &Server{
@@ -24,8 +29,8 @@ func NewServer(addr string, logger *slog.Logger, store app.Store, importAnalysis
 			Addr:              addr,
 			Handler:           handler,
 			ReadHeaderTimeout: 5 * time.Second,
-			ReadTimeout:       30 * time.Second,
-			WriteTimeout:      30 * time.Second,
+			ReadTimeout:       90 * time.Second,
+			WriteTimeout:      90 * time.Second,
 			IdleTimeout:       60 * time.Second,
 		},
 	}

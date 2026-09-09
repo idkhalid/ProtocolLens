@@ -26,6 +26,7 @@ ProtocolLens is a Go-first web workflow analysis toolkit that turns captured bro
 - Responsive narrow/mobile layout
 - Explicit safe HTTP replay, disabled by default
 - Client generation (cURL, Python httpx, Go net/http) from safe replay templates
+- Local workbench browser capture, disabled by default
 
 ## Architecture
 
@@ -100,7 +101,7 @@ npm run dev
 
 Open the frontend at `http://localhost:5173`. The API listens on `http://localhost:8080`.
 
-(Optional) To enable Playwright browser capture:
+(Optional) To build the Playwright browser capture adapter:
 
 ```sh
 cd browser
@@ -108,6 +109,14 @@ npm install
 npm run build
 npx playwright install chromium
 ```
+
+Enable local workbench capture only on a loopback server:
+
+```sh
+PROTOCOLLENS_ADDR=127.0.0.1:8080 PROTOCOLLENS_LOCAL_CAPTURE_ENABLED=true go run ./cmd/protocollens-server
+```
+
+`PROTOCOLLENS_LOCAL_CAPTURE_ENABLED` defaults to `false`. Normal server usage does not require Node, Playwright, Chromium, or `browser/dist`.
 
 Enable replay for local development only after reviewing the target network policy:
 
@@ -140,6 +149,8 @@ curl http://localhost:8080/api/v1/analyses/{id}/workflow
 curl http://localhost:8080/api/v1/analyses/{id}/requests/{requestId}/replay-template
 curl -X POST http://localhost:8080/api/v1/replay
 curl -X POST http://localhost:8080/api/v1/generate
+curl http://localhost:8080/api/v1/capabilities
+curl -X POST http://localhost:8080/api/v1/local/capture
 ```
 
 This is not a complete API reference; it lists the main inspection endpoints currently implemented.

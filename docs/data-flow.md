@@ -43,6 +43,14 @@ HTTP API
   |
   v
 React UI
+
+React Capture Workbench
+  |
+  v
+POST /api/v1/local/capture (local-only)
+  |
+  v
+same Playwright adapter
 ```
 
 Endpoint normalization keeps method, host, and path. Query values are retained on the request but ignored for endpoint grouping, so `/api/items?page=1` and `/api/items?page=2` map to the same endpoint.
@@ -100,3 +108,8 @@ Generated client code
 ```
 
 Client generation reuses the same safe replay template used by HTTP Replay. Generators do not read raw HAR data directly. Discarded secrets are not recovered. Generation performs no outbound network requests. Generated output is not persisted. Sensitive values are represented through deterministic environment-variable references. Generation logic lives in the Go backend. React only selects the target, displays generated code, and handles copy interaction.
+## Local capture flow
+
+The CLI `protocollens capture` command and the React Capture workbench both use the same Go Playwright capture lifecycle. The workbench route is disabled unless `PROTOCOLLENS_LOCAL_CAPTURE_ENABLED=true` and the server is bound to `localhost`, `127.0.0.1`, or `::1`.
+
+Browser capture runs page JavaScript and can cause wider outbound browser traffic than Safe Replay. That is why it remains local-only; normal public ProtocolLens deployments do not require Node, Playwright, Chromium, or `browser/dist`.

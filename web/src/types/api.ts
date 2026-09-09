@@ -125,3 +125,17 @@ export type GeneratorOutput = {
 	code: string
 	environmentVariables?: string[]
 }
+
+export type Capabilities = {
+  local_capture: {
+    enabled: boolean
+    adapter_built: boolean
+    node_available: boolean
+  }
+}
+
+export type CaptureRequest = {
+  url: string
+  duration_seconds: number
+  headed: boolean
+}

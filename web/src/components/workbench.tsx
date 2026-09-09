@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react'
-import { FileSearch, GitBranch, KeyRound, LayoutDashboard, Moon, Network, RotateCw, Server, Sun, Upload } from 'lucide-react'
+import { CircleDotDashed, FileSearch, GitBranch, KeyRound, LayoutDashboard, Moon, Network, RotateCw, Server, Sun, Upload } from 'lucide-react'
 import type { Analysis } from '../types/api'
 
-export type View = 'overview' | 'endpoints' | 'sessions' | 'dependencies' | 'workflow' | 'replay'
+export type View = 'overview' | 'capture' | 'endpoints' | 'sessions' | 'dependencies' | 'workflow' | 'replay'
 
 type Counts = {
   requests: number
@@ -19,6 +19,7 @@ type NavItem = {
 
 const navIcons = {
   overview: LayoutDashboard,
+  capture: CircleDotDashed,
   endpoints: Server,
   sessions: KeyRound,
   dependencies: GitBranch,
@@ -57,6 +58,7 @@ export function AppShell({
 }) {
   const items: NavItem[] = [
     { id: 'overview', label: 'Overview' },
+    { id: 'capture', label: 'Capture' },
     { id: 'endpoints', label: 'Endpoints', count: counts.endpoints },
     { id: 'sessions', label: 'Sessions', count: counts.sessions },
     { id: 'dependencies', label: 'Dependencies', count: counts.dependencies },
