@@ -26,6 +26,7 @@ type Template struct {
 	Headers        http.Header `json:"headers"`
 	Body           string      `json:"body"`
 	BodyAvailable  bool        `json:"bodyAvailable"`
+	BodyStruct     any         `json:"-"`
 	BodyReason     string      `json:"bodyReason,omitempty"`
 	ContentType    string      `json:"contentType,omitempty"`
 	RequiresReview bool        `json:"requiresReview"`
@@ -58,19 +59,20 @@ func BuildTemplate(analysisID string, request domain.Request) (Template, error) 
 		}
 		t.Headers[http.CanonicalHeaderKey(name)] = copyValues
 	}
-	body, available, reason, redacted := safeBody(request.Body, t.ContentType)
+	body, available, reason, redacted, structData := safeBody(request.Body, t.ContentType)
 	t.Body = body
 	t.BodyAvailable = available
 	t.BodyReason = reason
+	t.BodyStruct = structData
 	if redacted {
 		t.RequiresReview = true
 	}
 	return t, nil
 }
 
-func safeBody(body []byte, contentType string) (string, bool, string, bool) {
+func safeBody(body []byte, contentType string) (string, bool, string, bool, any) {
 	if len(body) == 0 {
-		return "", true, "", false
+		return "", true, "", false, nil
 	}
 	mediaType, _, _ := mime.ParseMediaType(contentType)
 	mediaType = strings.ToLower(mediaType)
@@ -78,7 +80,7 @@ func safeBody(body []byte, contentType string) (string, bool, string, bool) {
 	case "application/json":
 		var value any
 		if err := json.Unmarshal(body, &value); err != nil {
-			return "", false, "unsafe_unstructured_body", false
+			return "", false, "unsafe_unstructured_body", false, nil
 		}
 		redacted := redactJSON(value)
 		var out bytes.Buffer
@@ -86,13 +88,13 @@ func safeBody(body []byte, contentType string) (string, bool, string, bool) {
 		encoder.SetEscapeHTML(false)
 		encoder.SetIndent("", "  ")
 		if err := encoder.Encode(value); err != nil {
-			return "", false, "unsafe_unstructured_body", false
+			return "", false, "unsafe_unstructured_body", false, nil
 		}
-		return strings.TrimSuffix(out.String(), "\n"), true, "", redacted
+		return strings.TrimSuffix(out.String(), "\n"), true, "", redacted, value
 	case "application/x-www-form-urlencoded":
 		values, err := url.ParseQuery(string(body))
 		if err != nil {
-			return "", false, "unsafe_unstructured_body", false
+			return "", false, "unsafe_unstructured_body", false, nil
 		}
 		redacted := false
 		for name, items := range values {
@@ -104,12 +106,12 @@ func safeBody(body []byte, contentType string) (string, bool, string, bool) {
 				redacted = true
 			}
 		}
-		return values.Encode(), true, "", redacted
+		return values.Encode(), true, "", redacted, values
 	default:
 		if strings.HasPrefix(mediaType, "text/") {
-			return string(body), true, "", false
+			return string(body), true, "", false, nil
 		}
-		return "", false, "opaque_body_omitted", false
+		return "", false, "opaque_body_omitted", false, nil
 	}
 }
 

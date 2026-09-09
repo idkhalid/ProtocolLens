@@ -46,7 +46,7 @@ func TestReplayTemplateRedactsSecrets(t *testing.T) {
 	policy := replay.NewDestinationPolicy([]uint16{80, 443})
 	policy.Resolver = replayResolver{"host": {{IP: net.ParseIP("93.184.216.34")}}}
 	executor := &replay.Executor{Policy: policy, Client: &http.Client{Transport: replayRoundTrip(func(*http.Request) (*http.Response, error) { t.Fatal("template executed network"); return nil, nil })}, Timeout: time.Second, MaxRequestSize: 1024, MaxResponseSize: 1024}
-	registerRoutes(mux, store, importAnalysis, NewReplayRoutes(app.NewGetReplayTemplate(store), app.NewExecuteReplay(false, executor, 1), 1024))
+	registerRoutes(mux, store, importAnalysis, NewReplayRoutes(app.NewGetReplayTemplate(store), app.NewExecuteReplay(false, executor, 1), nil, 1024))
 
 	analysisID := importReplayHAR(t, mux)
 	w := httptest.NewRecorder()
@@ -80,7 +80,7 @@ func TestReplayAPISuccessAndRequestTooLarge(t *testing.T) {
 		}), Timeout: time.Second},
 		Timeout: time.Second, MaxRequestSize: 8, MaxResponseSize: 1024,
 	}
-	registerRoutes(mux, store, importAnalysis, NewReplayRoutes(app.NewGetReplayTemplate(store), app.NewExecuteReplay(true, executor, 1), 8))
+	registerRoutes(mux, store, importAnalysis, NewReplayRoutes(app.NewGetReplayTemplate(store), app.NewExecuteReplay(true, executor, 1), nil, 8))
 
 	w := httptest.NewRecorder()
 	mux.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/api/v1/replay", strings.NewReader(`{"method":"POST","url":"https://example.com/api","body":"too large"}`)))
