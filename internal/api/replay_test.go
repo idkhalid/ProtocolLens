@@ -126,3 +126,90 @@ func importReplayHAR(t *testing.T, mux *http.ServeMux) string {
 	}
 	return analysis.ID
 }
+
+func TestBenchmarkDisabledReturnsForbidden(t *testing.T) {
+	store, importAnalysis := testReplayStore(t)
+	mux := http.NewServeMux()
+	registerRoutes(mux, store, importAnalysis)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/api/v1/benchmark", strings.NewReader(`{"analysisId":"a","requestId":"r","method":"GET","url":"https://example.com","runs":1}`)))
+	if w.Code != http.StatusForbidden || !strings.Contains(w.Body.String(), "replay_disabled") {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestBenchmarkAPISuccessAndNonIdempotentGuard(t *testing.T) {
+	store, importAnalysis := testReplayStore(t)
+	calls := 0
+	executor := &replay.Executor{
+		Policy: replay.NewDestinationPolicy([]uint16{80, 443}),
+		Client: &http.Client{Transport: replayRoundTrip(func(req *http.Request) (*http.Response, error) {
+			calls++
+			if req.Method != http.MethodGet || req.URL.Path != "/edited" || req.URL.RawQuery != "x=1" || req.Header.Get("X-Edited") != "yes" {
+				t.Fatalf("benchmark used wrong request: %s %s headers=%v", req.Method, req.URL.String(), req.Header)
+			}
+			return &http.Response{StatusCode: http.StatusOK, Request: req, Header: http.Header{"Content-Type": {"text/plain"}}, Body: io.NopCloser(strings.NewReader("ok")), ContentLength: 2}, nil
+		})}, Timeout: time.Second, MaxRequestSize: 1024, MaxResponseSize: 1024,
+	}
+	mux := http.NewServeMux()
+	registerRoutes(mux, store, importAnalysis, NewReplayRoutes(app.NewGetReplayTemplate(store), app.NewExecuteReplay(true, executor, 1), nil, 1024))
+	analysisID := importReplayHAR(t, mux)
+
+	w := httptest.NewRecorder()
+	body := `{"analysisId":"` + analysisID + `","requestId":"req-000001","method":"GET","url":"https://example.com/edited?x=1","headers":{"X-Edited":["yes"]},"body":"","runs":3}`
+	mux.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/api/v1/benchmark", strings.NewReader(body)))
+	if w.Code != http.StatusOK || calls != 3 {
+		t.Fatalf("status=%d calls=%d body=%s", w.Code, calls, w.Body.String())
+	}
+	var out benchmarkResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &out); err != nil {
+		t.Fatal(err)
+	}
+	if !out.Browser.Available || len(out.HTTP.Runs) != 3 || !out.Comparison.Available || out.Method != "GET" {
+		t.Fatalf("benchmark response = %#v", out)
+	}
+
+	w = httptest.NewRecorder()
+	body = `{"analysisId":"` + analysisID + `","requestId":"req-000001","method":"POST","url":"https://example.com/edited?x=1","headers":{"X-Edited":["yes"]},"body":"","runs":3}`
+	mux.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/api/v1/benchmark", strings.NewReader(body)))
+	if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), "repeat_requires_confirmation") || calls != 3 {
+		t.Fatalf("status=%d calls=%d body=%s", w.Code, calls, w.Body.String())
+	}
+}
+
+func TestBenchmarkAPIStrictBoundsAndNotFound(t *testing.T) {
+	store, importAnalysis := testReplayStore(t)
+	calls := 0
+	executor := &replay.Executor{
+		Policy: replay.NewDestinationPolicy([]uint16{80, 443}),
+		Client: &http.Client{Transport: replayRoundTrip(func(req *http.Request) (*http.Response, error) {
+			calls++
+			return &http.Response{StatusCode: http.StatusOK, Request: req, Header: http.Header{"Content-Type": {"text/plain"}}, Body: io.NopCloser(strings.NewReader("ok")), ContentLength: 2}, nil
+		})}, Timeout: time.Second, MaxRequestSize: 1024, MaxResponseSize: 1024,
+	}
+	mux := http.NewServeMux()
+	registerRoutes(mux, store, importAnalysis, NewReplayRoutes(app.NewGetReplayTemplate(store), app.NewExecuteReplay(true, executor, 5), nil, 1024))
+	analysisID := importReplayHAR(t, mux)
+	base := `{"analysisId":"` + analysisID + `","requestId":"req-000001","method":"GET","url":"https://example.com/api","headers":{},"body":"","runs":0}`
+
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/api/v1/benchmark", strings.NewReader(base)))
+	if w.Code != http.StatusOK || calls != app.DefaultBenchmarkRuns {
+		t.Fatalf("default status=%d calls=%d body=%s", w.Code, calls, w.Body.String())
+	}
+
+	for name, body := range map[string]string{
+		"unknown":  `{"analysisId":"` + analysisID + `","requestId":"req-000001","method":"GET","url":"https://example.com/api","headers":{},"body":"","runs":1,"extra":true}`,
+		"trailing": `{"analysisId":"` + analysisID + `","requestId":"req-000001","method":"GET","url":"https://example.com/api","headers":{},"body":"","runs":1}{}`,
+		"runs6":    `{"analysisId":"` + analysisID + `","requestId":"req-000001","method":"GET","url":"https://example.com/api","headers":{},"body":"","runs":6}`,
+		"missingA": `{"analysisId":"missing","requestId":"req-000001","method":"GET","url":"https://example.com/api","headers":{},"body":"","runs":1}`,
+		"missingR": `{"analysisId":"` + analysisID + `","requestId":"missing","method":"GET","url":"https://example.com/api","headers":{},"body":"","runs":1}`,
+	} {
+		before := calls
+		w = httptest.NewRecorder()
+		mux.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/api/v1/benchmark", strings.NewReader(body)))
+		if w.Code == http.StatusOK || calls != before {
+			t.Fatalf("%s status=%d calls before=%d after=%d body=%s", name, w.Code, before, calls, w.Body.String())
+		}
+	}
+}

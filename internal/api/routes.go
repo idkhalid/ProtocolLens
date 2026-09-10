@@ -1,8 +1,10 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 
 	"protocollens/internal/app"
@@ -148,6 +150,43 @@ func registerRoutes(mux *http.ServeMux, store app.Store, importAnalysis *app.Imp
 		}
 		writeJSON(w, http.StatusOK, toReplayResponse(result))
 	})
+	mux.HandleFunc("POST /api/v1/benchmark", func(w http.ResponseWriter, r *http.Request) {
+		if replayUC.Execute == nil {
+			writeError(w, http.StatusForbidden, "replay_disabled", "HTTP replay is disabled on this server")
+			return
+		}
+		limit := replayUC.MaxRequestBytes
+		if limit <= 0 {
+			limit = 1 << 20
+		}
+		var input benchmarkRequest
+		dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, limit+4096))
+		dec.DisallowUnknownFields()
+		if err := dec.Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid_benchmark_request", "Benchmark request is invalid")
+			return
+		}
+		if err := dec.Decode(&struct{}{}); err != io.EOF {
+			writeError(w, http.StatusBadRequest, "invalid_benchmark_request", "Benchmark request is invalid")
+			return
+		}
+		if int64(len(input.Body)) > limit {
+			writeError(w, http.StatusRequestEntityTooLarge, "request_too_large", "Benchmark request body is too large")
+			return
+		}
+		result, err := app.NewBenchmark(store, replayUC.Execute).Execute(r.Context(), app.BenchmarkInput{
+			AnalysisID:                 input.AnalysisID,
+			RequestID:                  input.RequestID,
+			Request:                    app.ReplayRequestFrom(input.Method, input.URL, input.Headers, input.Body, input.FollowRedirects),
+			Runs:                       input.Runs,
+			AllowRepeatedNonIdempotent: input.AllowRepeatedNonIdempotent,
+		})
+		if err != nil {
+			writeBenchmarkError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, toBenchmarkResponse(result))
+	})
 	mux.HandleFunc("POST /api/v1/generate", func(w http.ResponseWriter, r *http.Request) {
 		if replayUC.GenerateClient == nil {
 			writeError(w, http.StatusForbidden, "replay_disabled", "HTTP replay is disabled on this server")
@@ -179,6 +218,20 @@ func writeAnalysisLoadError(w http.ResponseWriter, err error) {
 	writeError(w, http.StatusInternalServerError, "storage_error", "Analysis could not be loaded")
 }
 
+func writeBenchmarkError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, app.ErrBenchmarkInvalidRuns):
+		writeError(w, http.StatusBadRequest, "invalid_runs", "Benchmark runs must be between 1 and 5")
+	case errors.Is(err, app.ErrBenchmarkRepeatNeedsConfirm):
+		writeError(w, http.StatusBadRequest, "repeat_requires_confirmation", "Repeated execution requires confirmation for this HTTP method")
+	case errors.Is(err, domain.ErrNotFound):
+		writeError(w, http.StatusNotFound, "not_found", "Analysis or request was not found")
+	case errors.Is(err, context.Canceled):
+		writeError(w, http.StatusBadRequest, "benchmark_cancelled", "Benchmark was cancelled")
+	default:
+		writeReplayError(w, err)
+	}
+}
 func writeReplayError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, app.ErrReplayDisabled):

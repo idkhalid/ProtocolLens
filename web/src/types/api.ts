@@ -139,3 +139,31 @@ export type CaptureRequest = {
   duration_seconds: number
   headed: boolean
 }
+export type BenchmarkRequest = ReplayRequest & {
+  analysisId: string
+  requestId: string
+  runs: number
+  allowRepeatedNonIdempotent: boolean
+}
+
+export type BenchmarkResponse = {
+  method: string
+  requestId: string
+  browser: {
+    available: boolean
+    durationMs?: number
+  }
+  http: {
+    runs: Array<{ durationMs: number; statusCode: number; finalUrl: string; truncated: boolean }>
+    minMs: number
+    medianMs: number
+    meanMs: number
+    maxMs: number
+    consistentStatus: boolean
+  }
+  comparison: {
+    available: boolean
+    medianSpeedup?: number
+    reductionPercent?: number
+  }
+}

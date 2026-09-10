@@ -3,6 +3,7 @@ package api
 import (
 	"time"
 
+	"protocollens/internal/app"
 	"protocollens/internal/domain"
 	"protocollens/internal/graph"
 	"protocollens/internal/replay"
@@ -110,6 +111,53 @@ type replayResponse struct {
 	Truncated     bool                `json:"truncated"`
 }
 
+type benchmarkRequest struct {
+	AnalysisID                 string              `json:"analysisId"`
+	RequestID                  string              `json:"requestId"`
+	Method                     string              `json:"method"`
+	URL                        string              `json:"url"`
+	Headers                    map[string][]string `json:"headers"`
+	Body                       string              `json:"body"`
+	FollowRedirects            bool                `json:"followRedirects"`
+	Runs                       int                 `json:"runs"`
+	AllowRepeatedNonIdempotent bool                `json:"allowRepeatedNonIdempotent"`
+}
+
+type benchmarkResponse struct {
+	Method     string                      `json:"method"`
+	RequestID  string                      `json:"requestId"`
+	Browser    benchmarkBrowserResponse    `json:"browser"`
+	HTTP       benchmarkHTTPResponse       `json:"http"`
+	Comparison benchmarkComparisonResponse `json:"comparison"`
+}
+
+type benchmarkBrowserResponse struct {
+	Available  bool    `json:"available"`
+	DurationMs float64 `json:"durationMs,omitempty"`
+}
+
+type benchmarkHTTPResponse struct {
+	Runs             []benchmarkRunResponse `json:"runs"`
+	MinMs            float64                `json:"minMs"`
+	MedianMs         float64                `json:"medianMs"`
+	MeanMs           float64                `json:"meanMs"`
+	MaxMs            float64                `json:"maxMs"`
+	ConsistentStatus bool                   `json:"consistentStatus"`
+}
+
+type benchmarkRunResponse struct {
+	DurationMs float64 `json:"durationMs"`
+	StatusCode int     `json:"statusCode"`
+	FinalURL   string  `json:"finalUrl"`
+	Truncated  bool    `json:"truncated"`
+}
+
+type benchmarkComparisonResponse struct {
+	Available        bool    `json:"available"`
+	MedianSpeedup    float64 `json:"medianSpeedup,omitempty"`
+	ReductionPercent float64 `json:"reductionPercent,omitempty"`
+}
+
 type generateRequest struct {
 	AnalysisID string `json:"analysisId"`
 	RequestID  string `json:"requestId"`
@@ -166,4 +214,29 @@ func toEndpointResponses(endpoints []domain.EndpointSummary) []endpointResponse 
 
 func toReplayResponse(result replay.Result) replayResponse {
 	return replayResponse{StatusCode: result.StatusCode, DurationMs: result.Duration.Milliseconds(), FinalURL: result.FinalURL, Headers: result.Headers, Body: string(result.Body), BodyAvailable: result.BodyAvailable, ContentLength: result.ContentLength, ContentType: result.ContentType, Truncated: result.Truncated}
+}
+
+func toBenchmarkResponse(result app.BenchmarkResult) benchmarkResponse {
+	runs := make([]benchmarkRunResponse, len(result.HTTP.Runs))
+	for n, run := range result.HTTP.Runs {
+		runs[n] = benchmarkRunResponse{DurationMs: durationMs(run.Duration), StatusCode: run.Status, FinalURL: run.FinalURL, Truncated: run.Truncated}
+	}
+	return benchmarkResponse{
+		Method:    result.Method,
+		RequestID: result.RequestID,
+		Browser:   benchmarkBrowserResponse{Available: result.Browser.Available, DurationMs: durationMs(result.Browser.Duration)},
+		HTTP: benchmarkHTTPResponse{
+			Runs:             runs,
+			MinMs:            durationMs(result.HTTP.Min),
+			MedianMs:         durationMs(result.HTTP.Median),
+			MeanMs:           durationMs(result.HTTP.Mean),
+			MaxMs:            durationMs(result.HTTP.Max),
+			ConsistentStatus: result.HTTP.ConsistentStatus,
+		},
+		Comparison: benchmarkComparisonResponse{Available: result.Comparison.Available, MedianSpeedup: result.Comparison.MedianSpeedup, ReductionPercent: result.Comparison.ReductionPercent},
+	}
+}
+
+func durationMs(value time.Duration) float64 {
+	return float64(value) / float64(time.Millisecond)
 }

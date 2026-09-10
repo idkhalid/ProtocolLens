@@ -26,6 +26,7 @@ ProtocolLens is a Go-first web workflow analysis toolkit that turns captured bro
 - Responsive narrow/mobile layout
 - Explicit safe HTTP replay, disabled by default
 - Client generation (cURL, Python httpx, Go net/http) from safe replay templates
+- Browser-to-HTTP benchmark using bounded safe replay runs
 - Local workbench browser capture, disabled by default
 
 ## Architecture
@@ -205,9 +206,9 @@ See [docs/development.md](docs/development.md).
 
 ProtocolLens is under active development.
 
-Current baseline includes HAR import, Playwright traffic capture, endpoint analysis, session artifact analysis, deterministic dependency inference, derived workflow graphs, SQLite persistence, CLI/API access, safe HTTP replay, client generation, and a responsive React developer workbench.
+Current baseline includes HAR import, Playwright traffic capture, endpoint analysis, session artifact analysis, deterministic dependency inference, derived workflow graphs, SQLite persistence, CLI/API access, safe HTTP replay, client generation, browser-to-HTTP benchmarking, and a responsive React developer workbench.
 
-Planned work includes WebSocket/SSE analysis, and benchmark/browser-to-HTTP analysis.
+Planned work includes WebSocket/SSE analysis.
 
 ## License
 

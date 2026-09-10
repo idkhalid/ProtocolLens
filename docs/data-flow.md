@@ -36,6 +36,8 @@ SQLite
   |       |
   |       +--> Replay Executor
   |       |
+  |       +--> Browser-to-HTTP Benchmark
+  |       |
   |       +--> Client Generator
   |
   v
@@ -86,6 +88,26 @@ Limited response inspector
 
 Replay templates are derived from normalized exchanges and do not execute network traffic. Replay execution is explicit, disabled by default, SSRF-checked during dialing and redirects, size-limited, and not written to SQLite.
 
+## Benchmark flow
+
+```text
+Captured exchange timing
+  |
+  v
+Reviewed replay request
+  |
+  v
+POST /api/v1/benchmark
+  |
+  v
+1-5 sequential Replay executor runs
+  |
+  v
+Min / median / mean / max comparison
+```
+
+The benchmark baseline is the selected request's stored HAR duration. HTTP timings come from the current reviewed replay request, execute sequentially through the existing safe replay path with at most 5 runs, and are not persisted. Benchmarking does not launch a browser and is not a load test; results reflect current replay transport and connection conditions. Repeating non-idempotent methods requires an explicit UI acknowledgment and server-side flag.
+
 ## Client generation flow
 
 ```text
@@ -113,3 +135,4 @@ Client generation reuses the same safe replay template used by HTTP Replay. Gene
 The CLI `protocollens capture` command and the React Capture workbench both use the same Go Playwright capture lifecycle. The workbench route is disabled unless `PROTOCOLLENS_LOCAL_CAPTURE_ENABLED=true` and the server is bound to `localhost`, `127.0.0.1`, or `::1`.
 
 Browser capture runs page JavaScript and can cause wider outbound browser traffic than Safe Replay. That is why it remains local-only; normal public ProtocolLens deployments do not require Node, Playwright, Chromium, or `browser/dist`.
+
