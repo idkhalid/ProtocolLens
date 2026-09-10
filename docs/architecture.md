@@ -24,6 +24,8 @@ ProtocolLens is a Go application with a React visualization layer. The backend o
 
 `internal/replay` owns safe HTTP replay execution. It validates schemes, ports, hostnames, resolved IP addresses, redirects, request size, response size, and response header redaction before returning an ephemeral result. Replay is disabled by default and is never persisted.
 
+`internal/benchmark` and `app.Benchmark` compare one captured browser timing with a bounded sequence of safe replay executions. The browser baseline comes from the persisted HAR entry timing on the selected exchange. Benchmarking reuses the T5 replay executor and destination policy, adds no transport, performs no load generation, and stores no benchmark history.
+
 `internal/generator` creates reproducible HTTP client code (cURL, Python httpx, Go net/http) from safe replay templates, replacing sensitive secrets with environment variable lookups.
 
 ## Playwright Capture Adapter

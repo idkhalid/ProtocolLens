@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Send } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Activity, Play, Send, Square } from 'lucide-react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { getReplayTemplate, getWorkflow, sendReplay, generateClient } from '../../api/analyses'
+import { generateClient, getReplayTemplate, getWorkflow, runBenchmark, sendReplay } from '../../api/analyses'
 import { EmptyState, MethodBadge, StatusCode, formatMs } from '../../components/workbench'
-import type { ReplayRequest, ReplayResponse, ReplayTemplate, WorkflowNode } from '../../types/api'
+import type { BenchmarkRequest, BenchmarkResponse, ReplayRequest, ReplayResponse, ReplayTemplate, WorkflowNode } from '../../types/api'
 
 const methods = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
+const safeRepeatMethods = new Set(['GET', 'HEAD', 'OPTIONS'])
 
 export function ReplayPage({ analysisID }: { analysisID: string }) {
   const [requestID, setRequestID] = useState('')
@@ -70,11 +71,105 @@ export function ReplayPage({ analysisID }: { analysisID: string }) {
           </button>
           {replay.error ? <div className="mt-3 border border-[var(--danger-border)] bg-[var(--danger-bg)] p-2 text-xs text-[var(--danger)]">{replay.error.message}</div> : null}
         </section>
+        <BenchmarkPanel analysisID={analysisID} requestID={requestID} replayRequest={request()} />
         <GenerateClient analysisID={analysisID} requestID={requestID} />
       </div>
       <ResponseInspector result={result} loading={replay.isPending} />
     </div>
   )
+}
+
+function BenchmarkPanel({ analysisID, requestID, replayRequest }: { analysisID: string; requestID: string; replayRequest: ReplayRequest }) {
+  const [runs, setRuns] = useState(3)
+  const [allowRepeat, setAllowRepeat] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [result, setResult] = useState<BenchmarkResponse | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
+  const signature = JSON.stringify({ requestID, replayRequest })
+  const repeatedRisk = !safeRepeatMethods.has(replayRequest.method.toUpperCase()) && runs > 1
+
+  useEffect(() => {
+    abortRef.current?.abort()
+    abortRef.current = null
+    setLoading(false)
+    setError('')
+    setResult(null)
+    setAllowRepeat(false)
+  }, [signature])
+  useEffect(() => () => abortRef.current?.abort(), [])
+
+  async function start() {
+    const controller = new AbortController()
+    abortRef.current = controller
+    setLoading(true)
+    setError('')
+    setResult(null)
+    try {
+      const payload: BenchmarkRequest = { ...replayRequest, analysisId: analysisID, requestId: requestID, runs, allowRepeatedNonIdempotent: allowRepeat }
+      const next = await runBenchmark(payload, controller.signal)
+      if (abortRef.current === controller) setResult(next)
+    } catch (err) {
+      if ((err as Error).name !== 'AbortError' && abortRef.current === controller) setError((err as Error).message)
+    } finally {
+      if (abortRef.current === controller) {
+        abortRef.current = null
+        setLoading(false)
+      }
+    }
+  }
+
+  return (
+    <section className="replay-panel">
+      <div className="mb-3 flex items-center gap-2"><Activity className="h-4 w-4 text-[var(--accent)]" /><div className="replay-panel-header !mb-0">Browser vs HTTP</div></div>
+      <p className="text-xs text-[var(--muted)]">Compares observed browser request timing with bounded direct HTTP replay.</p>
+      <label className="field-label">Runs</label>
+      <input className="field-input mono max-w-24" type="number" min="1" max="5" value={runs} onChange={(event) => { setRuns(Number(event.target.value)); setResult(null); setAllowRepeat(false) }} disabled={loading} />
+      {repeatedRisk ? (
+        <label className="mt-3 flex items-start gap-2 text-xs text-[var(--text)]">
+          <input className="mt-0.5" type="checkbox" checked={allowRepeat} onChange={(event) => setAllowRepeat(event.target.checked)} disabled={loading} />
+          <span>This request will be sent {runs} times and may change server state.</span>
+        </label>
+      ) : null}
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button className="inline-flex h-8 items-center gap-2 rounded border border-[var(--accent)] bg-[var(--accent)] px-3 text-xs font-medium text-white disabled:opacity-50" type="button" disabled={loading || !requestID || (repeatedRisk && !allowRepeat)} onClick={start}>
+          <Play className="h-3.5 w-3.5" /> Run Benchmark
+        </button>
+        {loading ? <button className="inline-flex h-8 items-center gap-2 rounded border border-[var(--border)] px-3 text-xs" type="button" onClick={() => abortRef.current?.abort()}><Square className="h-3.5 w-3.5" /> Cancel</button> : null}
+      </div>
+      {loading ? <p className="mt-3 text-xs text-[var(--muted)]">Running sequential HTTP replay.</p> : null}
+      {error ? <div className="mt-3 border border-[var(--danger-border)] bg-[var(--danger-bg)] p-2 text-xs text-[var(--danger)]">{error}</div> : null}
+      {result ? <BenchmarkResultView result={result} /> : null}
+    </section>
+  )
+}
+
+function BenchmarkResultView({ result }: { result: BenchmarkResponse }) {
+  return (
+    <div className="mt-3 space-y-3 text-xs">
+      <div className="grid gap-2 sm:grid-cols-2">
+        <Metric label="Method" value={result.method} />
+        <Metric label="Request" value={result.requestId} />
+        <Metric label="Observed browser" value={result.browser.available ? formatMs(result.browser.durationMs ?? 0) : 'Unavailable'} />
+        <Metric label="HTTP median" value={formatMs(result.http.medianMs)} />
+        <Metric label="Speedup" value={result.comparison.available ? `${(result.comparison.medianSpeedup ?? 0).toFixed(2)}x` : 'Unavailable'} />
+        <Metric label="Latency reduction" value={result.comparison.available ? `${(result.comparison.reductionPercent ?? 0).toFixed(1)}%` : 'Unavailable'} />
+        <Metric label="Min / Mean / Max" value={`${formatMs(result.http.minMs)} / ${formatMs(result.http.meanMs)} / ${formatMs(result.http.maxMs)}`} />
+        <Metric label="Status" value={result.http.consistentStatus ? `${result.http.runs[0]?.statusCode ?? 'n/a'} consistent` : 'Mixed'} />
+      </div>
+      <div className="table-shell">
+        <table className="data-table">
+          <thead><tr><th>Run</th><th>Duration</th><th>Status</th></tr></thead>
+          <tbody>{result.http.runs.map((run, index) => <tr key={index}><td className="mono">#{index + 1}</td><td className="mono">{formatMs(run.durationMs)}</td><td><StatusCode value={run.statusCode} /></td></tr>)}</tbody>
+        </table>
+      </div>
+      <p className="text-[11px] text-[var(--muted)]">Timing reflects observed HAR and current replay transport conditions.</p>
+    </div>
+  )
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return <div className="border border-[var(--border)] bg-[var(--workspace)] p-2"><div className="text-[var(--muted)]">{label}</div><div className="mono mt-1 break-words">{value}</div></div>
 }
 
 function GenerateClient({ analysisID, requestID }: { analysisID: string; requestID: string }) {
@@ -96,11 +191,7 @@ function GenerateClient({ analysisID, requestID }: { analysisID: string; request
         <div className="replay-panel-header !mb-0">Generate Client</div>
         <div className="flex gap-1">
           {(['curl', 'python', 'go'] as const).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTarget(t)}
-              className={`px-2 py-1 text-xs font-medium rounded ${target === t ? 'bg-[var(--accent)] text-white' : 'bg-[var(--muted-bg)] text-[var(--muted)] hover:text-[var(--text)]'}`}
-            >
+            <button key={t} onClick={() => setTarget(t)} className={`px-2 py-1 text-xs font-medium rounded ${target === t ? 'bg-[var(--accent)] text-white' : 'bg-[var(--muted-bg)] text-[var(--muted)] hover:text-[var(--text)]'}`}>
               {t === 'curl' ? 'cURL' : t === 'python' ? 'Python' : 'Go'}
             </button>
           ))}
@@ -116,24 +207,13 @@ function GenerateClient({ analysisID, requestID }: { analysisID: string; request
             <div className="mb-2 text-xs">
               <span className="text-[var(--muted)]">Required environment variables:</span>
               <div className="flex flex-wrap gap-1 mt-1">
-                {generator.data.environmentVariables.map((env) => (
-                  <span key={env} className="px-1.5 py-0.5 rounded bg-[var(--muted-bg)] border border-[var(--border)] mono">{env}</span>
-                ))}
+                {generator.data.environmentVariables.map((env) => <span key={env} className="px-1.5 py-0.5 rounded bg-[var(--muted-bg)] border border-[var(--border)] mono">{env}</span>)}
               </div>
             </div>
           )}
           <div className="relative group">
-            <pre className="p-3 bg-[var(--surface)] border border-[var(--border)] rounded text-xs mono overflow-x-auto whitespace-pre">
-              {generator.data.code}
-            </pre>
-            <button
-              onClick={() => {
-                navigator.clipboard.writeText(generator.data.code)
-                setCopied(true)
-                setTimeout(() => setCopied(false), 2000)
-              }}
-              className="absolute top-2 right-2 px-2 py-1 text-xs rounded bg-[var(--accent)] text-white opacity-0 group-hover:opacity-100 transition-opacity"
-            >
+            <pre className="p-3 bg-[var(--surface)] border border-[var(--border)] rounded text-xs mono overflow-x-auto whitespace-pre">{generator.data.code}</pre>
+            <button onClick={() => { navigator.clipboard.writeText(generator.data.code); setCopied(true); setTimeout(() => setCopied(false), 2000) }} className="absolute top-2 right-2 px-2 py-1 text-xs rounded bg-[var(--accent)] text-white opacity-0 group-hover:opacity-100 transition-opacity">
               {copied ? 'Copied' : 'Copy'}
             </button>
           </div>
