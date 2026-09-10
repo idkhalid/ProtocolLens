@@ -113,7 +113,7 @@ export function CapturePage({ capabilities, onCaptured, onOpen }: { capabilities
           <Row label="Node" value={localCapture?.node_available ? 'Available' : 'Unavailable'} />
           <Row label="Duration" value="1-60s" />
         </dl>
-        {!localCapture?.adapter_built ? <p className="mt-3 font-mono text-[11px] text-[var(--muted)]">cd browser; npm install; npm run build; npx playwright install chromium</p> : null}
+        {!localCapture?.adapter_built ? <p className="mt-3 font-mono text-[11px] text-[var(--muted)]">cd browser; npm ci; npm run build; npx playwright install chromium</p> : null}
       </aside>
     </div>
   )

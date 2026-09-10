@@ -13,14 +13,25 @@ go run ./cmd/protocollens-server
 
 ```sh
 go run ./cmd/protocollens analyze examples/har/simple.har
+go run ./cmd/protocollens version
+```
+
+Release builds can inject the release version:
+
+```sh
+go build -ldflags "-X protocollens/internal/version.Version=v0.1.0" -o protocollens ./cmd/protocollens
+go build -ldflags "-X protocollens/internal/version.Version=v0.1.0" -o protocollens-server ./cmd/protocollens-server
 ```
 
 ## Frontend
 
 ```sh
 cd web
-npm install
+npm ci
 npm run dev
+npm run lint
+npm run typecheck
+npm run build
 ```
 
 The frontend expects `VITE_API_URL`, defaulting to `http://localhost:8080`.
@@ -29,13 +40,13 @@ The frontend expects `VITE_API_URL`, defaulting to `http://localhost:8080`.
 
 ```sh
 cd browser
-npm install
+npm ci
 npm run typecheck
 npm run build
 npx playwright install chromium
 ```
 
-The compiled `browser/dist/capture.js` must exist before the CLI capture command can be used.
+The compiled `browser/dist/capture.js` must exist before CLI or workbench capture can run. Normal API server use does not require Node, Playwright, Chromium, or `browser/dist`.
 
 ## Docker
 
@@ -43,9 +54,28 @@ The compiled `browser/dist/capture.js` must exist before the CLI capture command
 docker compose up --build
 ```
 
-The API stores SQLite data in `./data`.
+The API stores SQLite data in `./data` by default.
 
-## HTTP replay development
+## Configuration
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `PROTOCOLLENS_ADDR` | `:8080` | Server bind address. Local capture requires a loopback bind when enabled. |
+| `PROTOCOLLENS_DATABASE_PATH` | `data/protocollens.db` | SQLite database path. |
+| `PROTOCOLLENS_DATA_DIR` | `data` | Reserved data directory setting. |
+| `PROTOCOLLENS_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, or `error`. |
+| `PROTOCOLLENS_MAX_UPLOAD_SIZE` | `52428800` | HAR upload/read limit in bytes. |
+| `PROTOCOLLENS_REPLAY_ENABLED` | `false` | Safe Replay and Benchmark network execution gate. |
+| `PROTOCOLLENS_REPLAY_ALLOWED_PORTS` | `80,443` | Comma-separated outbound replay ports. |
+| `PROTOCOLLENS_REPLAY_TIMEOUT` | `10s` | Replay request timeout, capped at `60s`. |
+| `PROTOCOLLENS_REPLAY_MAX_REQUEST_SIZE` | `1048576` | Replay/benchmark request body limit. |
+| `PROTOCOLLENS_REPLAY_MAX_RESPONSE_SIZE` | `2097152` | Replay response body read limit. |
+| `PROTOCOLLENS_REPLAY_MAX_CONCURRENT` | `4` | Global active replay request limit. |
+| `PROTOCOLLENS_LOCAL_CAPTURE_ENABLED` | `false` | Local Playwright capture gate. |
+
+Malformed numeric, duration, port, and boolean values fall back to safe defaults. Network side effects are disabled by default.
+
+## HTTP Replay Development
 
 Replay is disabled by default:
 
@@ -57,16 +87,6 @@ For local development against allowed public destinations:
 
 ```sh
 PROTOCOLLENS_REPLAY_ENABLED=true go run ./cmd/protocollens-server
-```
-
-Replay configuration:
-
-```sh
-PROTOCOLLENS_REPLAY_ALLOWED_PORTS=80,443
-PROTOCOLLENS_REPLAY_TIMEOUT=10s
-PROTOCOLLENS_REPLAY_MAX_REQUEST_SIZE=1048576
-PROTOCOLLENS_REPLAY_MAX_RESPONSE_SIZE=2097152
-PROTOCOLLENS_REPLAY_MAX_CONCURRENT=4
 ```
 
 Public deployments should evaluate replay carefully. Even with SSRF checks and response limits, enabling replay on a public instance can create an outbound HTTP relay surface.

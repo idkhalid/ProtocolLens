@@ -95,8 +95,15 @@ func localHost(value string) bool {
 	host := value
 	if h, _, err := net.SplitHostPort(value); err == nil {
 		host = h
+	} else if strings.Contains(value, ":") && !strings.HasPrefix(value, "[") {
+		return false
 	}
-	host = strings.TrimPrefix(strings.TrimSuffix(host, "]"), "[")
+	if strings.HasPrefix(host, "[") || strings.HasSuffix(host, "]") {
+		if !(strings.HasPrefix(host, "[") && strings.HasSuffix(host, "]")) {
+			return false
+		}
+		host = strings.TrimPrefix(strings.TrimSuffix(host, "]"), "[")
+	}
 	if host == "localhost" {
 		return true
 	}

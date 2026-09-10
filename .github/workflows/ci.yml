@@ -4,22 +4,40 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
-  test:
-    runs-on: ubuntu-latest
+  go:
+    name: go (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version: "1.26"
+      - run: go test ./...
+      - run: go test -race ./...
+        if: matrix.os == 'ubuntu-latest'
+      - run: go vet ./...
+      - run: go build ./...
+
+  node:
+    name: node packages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
           cache: npm
-          cache-dependency-path: web/package-lock.json
-      - run: go test ./...
-      - run: go vet ./...
-      - run: go build ./...
+          cache-dependency-path: |
+            web/package-lock.json
+            browser/package-lock.json
       - run: npm ci
         working-directory: web
       - run: npm run lint
@@ -28,3 +46,9 @@ jobs:
         working-directory: web
       - run: npm run build
         working-directory: web
+      - run: npm ci
+        working-directory: browser
+      - run: npm run typecheck
+        working-directory: browser
+      - run: npm run build
+        working-directory: browser
