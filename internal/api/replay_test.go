@@ -213,3 +213,42 @@ func TestBenchmarkAPIStrictBoundsAndNotFound(t *testing.T) {
 		}
 	}
 }
+
+func TestReplayRejectsBadJSONBeforeNetwork(t *testing.T) {
+	store, importAnalysis := testReplayStore(t)
+	calls := 0
+	executor := &replay.Executor{
+		Policy: replay.NewDestinationPolicy([]uint16{80, 443}),
+		Client: &http.Client{Transport: replayRoundTrip(func(req *http.Request) (*http.Response, error) {
+			calls++
+			return &http.Response{StatusCode: http.StatusOK, Request: req, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(""))}, nil
+		})}, Timeout: time.Second, MaxRequestSize: 1024, MaxResponseSize: 1024,
+	}
+	mux := http.NewServeMux()
+	registerRoutes(mux, store, importAnalysis, NewReplayRoutes(nil, app.NewExecuteReplay(true, executor, 1), nil, 1024))
+
+	for _, body := range []string{
+		`{"method":`,
+		`{"method":"GET","url":"https://example.com","extra":true}`,
+		`{"method":"GET","url":"https://example.com"}{}`,
+	} {
+		w := httptest.NewRecorder()
+		mux.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/api/v1/replay", strings.NewReader(body)))
+		if w.Code != http.StatusBadRequest || calls != 0 {
+			t.Fatalf("body=%s status=%d calls=%d", body, w.Code, calls)
+		}
+	}
+}
+
+func TestBenchmarkDisabledBeforeAnalysisLookup(t *testing.T) {
+	store, importAnalysis := testReplayStore(t)
+	executor := &replay.Executor{Policy: replay.NewDestinationPolicy([]uint16{80, 443}), Timeout: time.Second, MaxRequestSize: 1024, MaxResponseSize: 1024}
+	mux := http.NewServeMux()
+	registerRoutes(mux, store, importAnalysis, NewReplayRoutes(nil, app.NewExecuteReplay(false, executor, 1), nil, 1024))
+
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/api/v1/benchmark", strings.NewReader(`{"analysisId":"missing","requestId":"r","method":"GET","url":"https://example.com","runs":1}`)))
+	if w.Code != http.StatusForbidden || !strings.Contains(w.Body.String(), "replay_disabled") {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+}

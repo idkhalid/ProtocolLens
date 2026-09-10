@@ -13,6 +13,8 @@ import (
 	"protocollens/internal/replay"
 )
 
+const generateBodyLimit = 8 << 10
+
 type replayRoutes struct {
 	GetTemplate     *app.GetReplayTemplate
 	Execute         *app.ExecuteReplay
@@ -126,7 +128,7 @@ func registerRoutes(mux *http.ServeMux, store app.Store, importAnalysis *app.Imp
 	})
 
 	mux.HandleFunc("POST /api/v1/replay", func(w http.ResponseWriter, r *http.Request) {
-		if replayUC.Execute == nil {
+		if replayUC.Execute == nil || !replayUC.Execute.Enabled {
 			writeError(w, http.StatusForbidden, "replay_disabled", "HTTP replay is disabled on this server")
 			return
 		}
@@ -135,7 +137,13 @@ func registerRoutes(mux *http.ServeMux, store app.Store, importAnalysis *app.Imp
 			limit = 1 << 20
 		}
 		var input replayRequest
-		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, limit+4096)).Decode(&input); err != nil {
+		dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, limit+4096))
+		dec.DisallowUnknownFields()
+		if err := dec.Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid_replay_request", "Replay request is invalid")
+			return
+		}
+		if err := dec.Decode(&struct{}{}); err != io.EOF {
 			writeError(w, http.StatusBadRequest, "invalid_replay_request", "Replay request is invalid")
 			return
 		}
@@ -151,7 +159,7 @@ func registerRoutes(mux *http.ServeMux, store app.Store, importAnalysis *app.Imp
 		writeJSON(w, http.StatusOK, toReplayResponse(result))
 	})
 	mux.HandleFunc("POST /api/v1/benchmark", func(w http.ResponseWriter, r *http.Request) {
-		if replayUC.Execute == nil {
+		if replayUC.Execute == nil || !replayUC.Execute.Enabled {
 			writeError(w, http.StatusForbidden, "replay_disabled", "HTTP replay is disabled on this server")
 			return
 		}
@@ -193,7 +201,13 @@ func registerRoutes(mux *http.ServeMux, store app.Store, importAnalysis *app.Imp
 			return
 		}
 		var input generateRequest
-		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, generateBodyLimit))
+		dec.DisallowUnknownFields()
+		if err := dec.Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid_request", "Invalid JSON body")
+			return
+		}
+		if err := dec.Decode(&struct{}{}); err != io.EOF {
 			writeError(w, http.StatusBadRequest, "invalid_request", "Invalid JSON body")
 			return
 		}

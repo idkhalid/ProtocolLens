@@ -12,6 +12,7 @@ import (
 	"protocollens/internal/config"
 	"protocollens/internal/domain"
 	"protocollens/internal/storage/sqlite"
+	"protocollens/internal/version"
 )
 
 func main() {
@@ -31,6 +32,8 @@ func main() {
 		if err := runCapture(cfg, os.Args[2:]); err != nil {
 			log.Fatalf("capture error: %v", err)
 		}
+	case "version", "--version", "-v":
+		fmt.Println(version.Version)
 	default:
 		usage()
 	}
@@ -40,6 +43,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "usage:")
 	fmt.Fprintln(os.Stderr, "  protocollens analyze <file.har>")
 	fmt.Fprintln(os.Stderr, "  protocollens capture [--headed] [--duration <seconds>] <url>")
+	fmt.Fprintln(os.Stderr, "  protocollens version")
 	os.Exit(2)
 }
 

@@ -184,6 +184,9 @@ func TestLocalCaptureLocalRequestBoundary(t *testing.T) {
 		{"localhost:8080", "http://localhost.evil.example", "127.0.0.1:12345"},
 		{"localhost:8080", "", "192.168.1.5:12345"},
 		{"localhost:8080", "", "8.8.8.8:12345"},
+		{"[::1", "", "127.0.0.1:12345"},
+		{"::1", "", "127.0.0.1:12345"},
+		{"localhost:8080", "http://[::1", "127.0.0.1:12345"},
 	}
 	for _, tt := range rejected {
 		req := localCaptureTestRequest(`{"url":"https://example.com","duration_seconds":5,"headed":false}`)

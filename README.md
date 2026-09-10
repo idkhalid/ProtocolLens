@@ -84,6 +84,20 @@ Inferred dependencies describe observable client-side data flow. They are eviden
 
 ProtocolLens does not make HAR files inherently safe. Avoid importing sensitive production traffic unless it has been sanitized.
 
+## Version
+
+Development builds report `dev`:
+
+```sh
+go run ./cmd/protocollens version
+```
+
+Release builds can inject `v0.1.0`:
+
+```sh
+go build -ldflags "-X protocollens/internal/version.Version=v0.1.0" ./cmd/protocollens
+```
+
 ## Quick start
 
 Start the API:
@@ -96,7 +110,7 @@ Start the frontend:
 
 ```sh
 cd web
-npm install
+npm ci
 npm run dev
 ```
 
@@ -106,7 +120,7 @@ Open the frontend at `http://localhost:5173`. The API listens on `http://localho
 
 ```sh
 cd browser
-npm install
+npm ci
 npm run build
 npx playwright install chromium
 ```
@@ -126,6 +140,8 @@ PROTOCOLLENS_REPLAY_ENABLED=true go run ./cmd/protocollens-server
 ```
 
 Default replay limits are ports `80,443`, timeout `10s`, request body `1 MiB`, response body `2 MiB`, and four concurrent replay requests.
+
+By default SQLite data is stored at `data/protocollens.db`; override it with `PROTOCOLLENS_DATABASE_PATH`.
 Run a CLI analysis:
 
 ```sh
@@ -184,6 +200,25 @@ Frontend:
 
 ```sh
 cd web
+npm ci
+npm run lint
+npm run typecheck
+npm run build
+```
+
+Optional browser capture adapter:
+
+```sh
+cd browser
+npm ci
+npm run typecheck
+npm run build
+```
+
+Frontend:
+
+```sh
+cd web
 npm run lint
 npm run typecheck
 npm run build
@@ -204,7 +239,7 @@ See [docs/development.md](docs/development.md).
 
 ## Project status
 
-ProtocolLens is under active development.
+ProtocolLens is preparing its first public release, `v0.1.0`.
 
 Current baseline includes HAR import, Playwright traffic capture, endpoint analysis, session artifact analysis, deterministic dependency inference, derived workflow graphs, SQLite persistence, CLI/API access, safe HTTP replay, client generation, browser-to-HTTP benchmarking, and a responsive React developer workbench.
 
